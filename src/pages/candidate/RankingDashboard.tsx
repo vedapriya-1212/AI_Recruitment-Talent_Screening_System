@@ -135,7 +135,56 @@ export default function RankingDashboard() {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
 
+      {/* LEADERBOARD TABLE */}
+      <div className="space-y-4">
+        <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">Leaderboard Registry</h4>
+        
+        <div className="rounded-2xl glass-panel bg-[#071021]/30 border border-white/6 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/2 text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space">
+                  <th className="p-4">Rank</th>
+                  <th className="p-4">Candidate Name</th>
+                  <th className="p-4">Semantic Score</th>
+                  <th className="p-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 font-outfit">
+                {[...candidates].sort((a, b) => a.rank - b.rank).map((cand) => {
+                  const isMe = cand.email.toLowerCase() === user?.email?.toLowerCase();
+                  return (
+                    <tr 
+                      key={cand.id} 
+                      className={`transition-colors ${
+                        isMe ? 'bg-primaryGlow/5 border-l-2 border-l-primaryGlow' : 'hover:bg-white/2'
+                      }`}
+                    >
+                      <td className="p-4 font-bold text-white font-space">
+                        {isMe ? <span className="text-primaryGlow">#0{cand.rank} (You)</span> : `#0{cand.rank}`}
+                      </td>
+                      <td className="p-4 font-bold text-white uppercase tracking-wider font-space">{cand.name}</td>
+                      <td className="p-4 font-bold text-primaryGlow font-space">{cand.matchScore}%</td>
+                      <td className="p-4">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase font-space ${
+                          cand.status === 'Selected' ? 'bg-success/15 text-success border border-success/25' :
+                          cand.status === 'Rejected' ? 'bg-error/15 text-error border border-error/25' :
+                          cand.status === 'Interview' ? 'bg-[#FFD166]/15 text-[#FFD166] border border-[#FFD166]/25' :
+                          cand.status === 'Shortlisted' ? 'bg-[#4FFAF0]/15 text-[#4FFAF0] border border-[#4FFAF0]/25' :
+                          'bg-white/5 text-mutedGray border border-white/10'
+                        }`}>
+                          {cand.status === 'Interview' ? 'Interview Scheduled' : cand.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {/* GAPS & SKILL ALIGNMENTS */}

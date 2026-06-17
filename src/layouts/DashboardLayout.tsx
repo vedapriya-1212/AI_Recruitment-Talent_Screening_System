@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Cpu, LayoutDashboard, PlusCircle, Users, Trophy, 
-  Calendar, BarChart3, UserCheck, Activity, LogOut, Bell, X, Menu 
+  Calendar, BarChart3, UserCheck, Activity, LogOut, Bell, X, Menu,
+  Briefcase, ClipboardList, Percent 
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -50,10 +52,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const candidateItems: SidebarItem[] = [
     { label: 'Dashboard', path: '/candidate/dashboard', icon: LayoutDashboard },
+    { label: 'Available Jobs', path: '/candidate/jobs', icon: Briefcase },
+    { label: 'My Applications', path: '/candidate/applications', icon: ClipboardList },
+    { label: 'Resume Analysis', path: '/candidate/resume', icon: Cpu },
+    { label: 'Match Scores', path: '/candidate/match', icon: Percent },
+    { label: 'Ranking Status', path: '/candidate/rankings', icon: Trophy },
+    { label: 'Notifications', path: '/candidate/notifications', icon: Bell },
     { label: 'Profile', path: '/candidate/profile', icon: UserCheck },
-    { label: 'Tracker', path: '/candidate/tracker', icon: Activity },
-    { label: 'AI Screening', path: '/candidate/screening-results', icon: Cpu },
-    { label: 'Ranks Graph', path: '/candidate/rankings', icon: Trophy },
   ];
 
   const items = role === 'recruiter' ? recruiterItems : candidateItems;

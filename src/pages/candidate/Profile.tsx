@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApplication } from '../../contexts/ApplicationContext';
-import { motion } from 'framer-motion';
-import { User, Mail, Globe, Award, CloudUpload, FileText, CheckCircle2, Cpu } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Mail, Globe, Award, CloudUpload, FileText, CheckCircle2, Cpu, Key, Lock, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Github = (props: React.SVGProps<SVGSVGElement>) => (
@@ -20,23 +20,31 @@ const Linkedin = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-
 export default function CandidateProfile() {
   const { user } = useAuth();
   const { candidates } = useApplication();
 
   const myProfile = candidates.find((c) => c.email.toLowerCase() === user?.email.toLowerCase()) || candidates[0];
 
-  // Form states
+  // Editable fields states
   const [firstName, setFirstName] = useState(user?.first_name || '');
   const [lastName, setLastName] = useState(user?.last_name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [portfolio, setPortfolio] = useState('https://jenkins.dev');
   const [github, setGithub] = useState('github.com/sjenkins');
   const [linkedin, setLinkedin] = useState('linkedin.com/in/sjenkins');
+  const [profilePic, setProfilePic] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120&h=120');
+  
+  // Skills list state
+  const [skillsText, setSkillsText] = useState(myProfile.skills.join(', '));
+  const [skillsList, setSkillsList] = useState<string[]>(myProfile.skills);
+
+  // Change Password Modal States
+  const [passModalOpen, setPassModalOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   // Load custom detailed profile details
-  const [skillsList, setSkillsList] = useState<string[]>(myProfile.skills);
   React.useEffect(() => {
     const stored = localStorage.getItem('user_detailed_profile');
     if (stored) {
@@ -49,6 +57,7 @@ export default function CandidateProfile() {
           setPortfolio(`https://${parsed.preferredRole.toLowerCase().replace(/[^a-z0-9]/g, '')}.dev`);
         }
         if (parsed.skills) {
+          setSkillsText(parsed.skills);
           const splitSkills = parsed.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
           if (splitSkills.length > 0) {
             setSkillsList(splitSkills);
@@ -57,11 +66,23 @@ export default function CandidateProfile() {
       } catch {}
     }
   }, [myProfile]);
-  
-  // File upload simulation states
+
+  // Dynamic values
+  const appliedJobsCount = React.useMemo(() => {
+    const stored = localStorage.getItem('applied_jobs_list');
+    let appliedCount = 2; // Default starting count matching submission history
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        appliedCount += list.length;
+      } catch {}
+    }
+    return appliedCount;
+  }, []);
+
+  const [uploadedFile, setUploadedFile] = useState<string | null>('sarah_jenkins_resume.pdf');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
 
   const simulateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,20 +92,54 @@ export default function CandidateProfile() {
     setUploadProgress(10);
     setUploadedFile(file.name);
 
-    // Simulated parsing steps in timer intervals
     const interval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
           setUploading(false);
           toast.success('Resume Ingested Successfully', {
-            description: 'AI Core parsed 6 technical skill tokens and mapped matching ranks.',
+            description: 'AI Core updated your profile coordinates and metadata.',
           });
           return 100;
         }
-        return prev + 18;
+        return prev + 20;
       });
-    }, 400);
+    }, 300);
+  };
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Update skills list based on comma input
+    const parsedSkills = skillsText.split(',').map((s) => s.trim()).filter(Boolean);
+    setSkillsList(parsedSkills);
+    
+    // Save to local storage mock
+    const updatedProfile = {
+      firstName,
+      lastName,
+      skills: skillsText,
+      githubUrl: github,
+      profilePic,
+    };
+    localStorage.setItem('user_detailed_profile', JSON.stringify(updatedProfile));
+
+    toast.success('Profile Updated Successfully', {
+      description: 'Your structural data and skills registry have been saved.',
+    });
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword) {
+      toast.error('Please fill in both password fields.');
+      return;
+    }
+    toast.success('Password Changed successfully', {
+      description: 'Your login credentials have been updated.',
+    });
+    setOldPassword('');
+    setNewPassword('');
+    setPassModalOpen(false);
   };
 
   const getUploadLoaderText = () => {
@@ -92,6 +147,18 @@ export default function CandidateProfile() {
     if (uploadProgress < 60) return 'Extracting Technical Keywords...';
     if (uploadProgress < 90) return 'Calculating Match Alignment...';
     return 'Compiling Final Recommendations...';
+  };
+
+  const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePic(reader.result as string);
+        toast.success('Profile picture updated!');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -113,9 +180,44 @@ export default function CandidateProfile() {
         {/* LEFT COLUMN: Profile Form Fields (Col-span 7) */}
         <div className="lg:col-span-7 space-y-6">
           <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-6">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Personal Credentials</h4>
             
-            <form onSubmit={(e) => { e.preventDefault(); toast.success('Profile saved successfully'); }} className="space-y-5">
+            {/* Header info */}
+            <div className="flex justify-between items-center">
+              <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Personal Credentials</h4>
+              <button
+                onClick={() => setPassModalOpen(true)}
+                className="text-[10px] font-bold text-primaryGlow uppercase tracking-wider font-space hover:underline flex items-center gap-1.5 cursor-pointer"
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>Change Password</span>
+              </button>
+            </div>
+            
+            {/* Profile Picture Uploader */}
+            <div className="flex items-center gap-5">
+              <div className="relative group shrink-0">
+                <img
+                  src={profilePic}
+                  alt="Profile"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-primaryGlow/50 shadow-[0_0_15px_rgba(79,250,240,0.15)] bg-white/5"
+                />
+                <label className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity duration-200">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePicChange}
+                    className="hidden"
+                  />
+                  <ImageIcon className="w-5 h-5 text-primaryGlow" />
+                </label>
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block uppercase tracking-wider font-space">Profile Image</span>
+                <span className="text-[10px] text-mutedGray block font-outfit mt-1">Hover image and click to upload customized picture.</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateProfile} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">First Name</label>
@@ -154,6 +256,21 @@ export default function CandidateProfile() {
                     value={email}
                     disabled
                     className="w-full bg-white/1 border border-white/5 text-mutedGray rounded-xl py-3 pl-10 pr-4 text-xs cursor-not-allowed font-outfit"
+                  />
+                </div>
+              </div>
+
+              {/* Editable Skills List */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Skills (Comma Separated)</label>
+                <div className="relative">
+                  <Award className="absolute left-3 top-3.5 w-4 h-4 text-mutedGray" />
+                  <input
+                    type="text"
+                    value={skillsText}
+                    onChange={(e) => setSkillsText(e.target.value)}
+                    placeholder="React, TypeScript, CSS, Node.js..."
+                    className="w-full bg-white/3 border border-white/6 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-outfit"
                   />
                 </div>
               </div>
@@ -200,20 +317,38 @@ export default function CandidateProfile() {
 
               <button
                 type="submit"
-                className="px-6 py-3 rounded-xl bg-white/4 border border-white/6 hover:bg-white/6 hover:border-white/10 text-xs font-bold text-white uppercase tracking-wider font-space cursor-pointer transition-colors"
+                className="px-6 py-3 rounded-xl bg-primaryGlow text-black font-bold hover:scale-[1.02] text-xs uppercase tracking-wider font-space cursor-pointer transition-all shadow-[0_0_12px_rgba(79,250,240,0.15)]"
               >
-                Save Profile
+                Update Profile
               </button>
             </form>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Resume Ingestion & Loader checks (Col-span 5) */}
+        {/* RIGHT COLUMN: Resume Ingestion & Pipeline stats (Col-span 5) */}
         <div className="lg:col-span-5 space-y-6">
+          
+          {/* STATS OVERVIEW CARDS */}
+          <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4 font-outfit">
+            <h4 className="text-xs font-black text-white uppercase tracking-wider font-space mb-2">Workspace Metrics</h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-left">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-mutedGray font-space block">Submissions</span>
+                <span className="text-lg font-black text-white font-space mt-1 block">{appliedJobsCount} Applications</span>
+              </div>
+              
+              <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-left">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-mutedGray font-space block">Leaderboard Rank</span>
+                <span className="text-lg font-black text-[#FFD166] font-space mt-1 block">#0{myProfile.rank} Position</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Resume Upload Box */}
           <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-6">
             <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Resume Ingestion</h4>
             
-            {/* Drop Box */}
             <div className="relative border border-dashed border-white/10 rounded-2xl p-8 text-center bg-white/1 flex flex-col items-center justify-center gap-4 hover:border-primaryGlow/40 transition-colors group">
               <input
                 type="file"
@@ -244,11 +379,11 @@ export default function CandidateProfile() {
               ) : uploadedFile ? (
                 <div className="space-y-3">
                   <div className="w-10 h-10 rounded-xl bg-success/10 border border-success/25 text-success flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-5 h-5 animate-pulse" />
+                    <FileText className="w-5 h-5" />
                   </div>
                   <div>
                     <span className="text-xs font-bold text-white block truncate max-w-[180px] mx-auto">{uploadedFile}</span>
-                    <span className="text-[9px] text-success font-bold uppercase tracking-wider font-space mt-1 block">Successfully Ingested</span>
+                    <span className="text-[9px] text-success font-bold uppercase tracking-wider font-space mt-1 block">Ingested & Indexed</span>
                   </div>
                 </div>
               ) : (
@@ -283,6 +418,66 @@ export default function CandidateProfile() {
         </div>
 
       </div>
+
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {passModalOpen && (
+          <>
+            <div onClick={() => setPassModalOpen(false)} className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 m-auto w-full max-w-md h-fit z-50 bg-[#071021] border border-white/10 p-6 md:p-8 rounded-2xl shadow-2xl text-left"
+            >
+              <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-5">
+                <span className="text-xs font-black uppercase tracking-wider font-space text-white">Update Security Coordinates</span>
+                <button onClick={() => setPassModalOpen(false)} className="text-mutedGray hover:text-white transition-colors cursor-pointer text-xs font-bold">Close</button>
+              </div>
+
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Current Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 w-4 h-4 text-mutedGray" />
+                    <input
+                      type="password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      className="w-full bg-white/3 border border-white/6 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-outfit"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">New Secure Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 w-4 h-4 text-mutedGray" />
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      className="w-full bg-white/3 border border-white/6 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-outfit"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-primaryGlow text-black font-bold uppercase tracking-wider font-space text-xs rounded-xl hover:scale-[1.01] transition-transform shadow-[0_0_12px_rgba(79,250,240,0.15)] cursor-pointer"
+                >
+                  Change Password
+                </button>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

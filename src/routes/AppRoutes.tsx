@@ -20,6 +20,12 @@ import CandidateProfile from '../pages/candidate/Profile';
 import Tracker from '../pages/candidate/Tracker';
 import ScreeningResults from '../pages/candidate/ScreeningResults';
 import RankingDashboard from '../pages/candidate/RankingDashboard';
+import AvailableJobs from '../pages/candidate/AvailableJobs';
+import MyApplications from '../pages/candidate/MyApplications';
+import ResumeUpload from '../pages/candidate/ResumeUpload';
+import MatchScores from '../pages/candidate/MatchScores';
+import Notifications from '../pages/candidate/Notifications';
+import InterviewInvitation from '../pages/candidate/InterviewInvitation';
 
 export default function AppRoutes() {
   return (
@@ -112,6 +118,46 @@ export default function AppRoutes() {
         }
       />
       <Route
+        path="/candidate/jobs"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <AvailableJobs />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/applications"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <MyApplications />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/resume"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <ResumeUpload />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/match"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <MatchScores />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/candidate/profile"
         element={
           <ProtectedRoute allowedRole="candidate">
@@ -147,6 +193,26 @@ export default function AppRoutes() {
           <ProtectedRoute allowedRole="candidate">
             <DashboardLayout>
               <RankingDashboard />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/notifications"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <Notifications />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/interviews"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <InterviewInvitation />
             </DashboardLayout>
           </ProtectedRoute>
         }

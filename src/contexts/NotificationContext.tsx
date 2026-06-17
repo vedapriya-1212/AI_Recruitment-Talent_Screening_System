@@ -15,6 +15,7 @@ interface NotificationContextType {
   unreadCount: number;
   addNotification: (title: string, message: string, type?: AppNotification['type']) => void;
   markAsRead: (id: string) => void;
+  deleteNotification: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
 }
@@ -25,19 +26,35 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [notifications, setNotifications] = useState<AppNotification[]>([
     {
       id: 'init-1',
-      title: 'Neural Core Online',
-      message: 'Autonomous screening agents compiled successfully.',
+      title: 'Interview Scheduled',
+      message: 'Your interview for Senior React Architect has been scheduled with Tech Lead.',
       timestamp: 'Just now',
+      read: false,
+      type: 'info',
+    },
+    {
+      id: 'init-2',
+      title: 'Application Shortlisted',
+      message: 'Your application for the Security Operations Lead role has been shortlisted.',
+      timestamp: '10m ago',
       read: false,
       type: 'success',
     },
     {
-      id: 'init-2',
-      title: 'Interview Booked',
-      message: 'Sarah Jenkins confirmed slots for Today at 2:00 PM.',
-      timestamp: '10m ago',
-      read: false,
+      id: 'init-3',
+      title: 'Profile Viewed',
+      message: 'A recruiter from ZeroTrust Lab viewed your indexed profile skills.',
+      timestamp: '2h ago',
+      read: true,
       type: 'info',
+    },
+    {
+      id: 'init-4',
+      title: 'Application Rejected',
+      message: 'Unfortunately, your application for the Junior Python Engineer role was rejected.',
+      timestamp: '1d ago',
+      read: true,
+      type: 'error',
     },
   ]);
 
@@ -71,6 +88,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     );
   };
 
+  const deleteNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
   const markAllAsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
@@ -88,6 +109,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         unreadCount,
         addNotification,
         markAsRead,
+        deleteNotification,
         markAllAsRead,
         clearAll,
       }}
