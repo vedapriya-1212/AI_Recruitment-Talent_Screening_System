@@ -34,6 +34,29 @@ export default function CandidateProfile() {
   const [portfolio, setPortfolio] = useState('https://jenkins.dev');
   const [github, setGithub] = useState('github.com/sjenkins');
   const [linkedin, setLinkedin] = useState('linkedin.com/in/sjenkins');
+
+  // Load custom detailed profile details
+  const [skillsList, setSkillsList] = useState<string[]>(myProfile.skills);
+  React.useEffect(() => {
+    const stored = localStorage.getItem('user_detailed_profile');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.githubUrl) {
+          setGithub(parsed.githubUrl);
+        }
+        if (parsed.preferredRole) {
+          setPortfolio(`https://${parsed.preferredRole.toLowerCase().replace(/[^a-z0-9]/g, '')}.dev`);
+        }
+        if (parsed.skills) {
+          const splitSkills = parsed.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
+          if (splitSkills.length > 0) {
+            setSkillsList(splitSkills);
+          }
+        }
+      } catch {}
+    }
+  }, [myProfile]);
   
   // File upload simulation states
   const [uploading, setUploading] = useState(false);
@@ -247,7 +270,7 @@ export default function CandidateProfile() {
             <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Competencies Registry</h4>
             
             <div className="flex gap-1.5 flex-wrap">
-              {myProfile.skills.map((skill, index) => (
+              {skillsList.map((skill, index) => (
                 <span
                   key={index}
                   className="text-[9px] font-bold text-primaryGlow bg-primaryGlow/10 border border-primaryGlow/25 px-2.5 py-1 rounded-full font-space uppercase"

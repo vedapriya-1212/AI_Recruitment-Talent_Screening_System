@@ -21,6 +21,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const [detailedProfile, setDetailedProfile] = useState<any>(null);
+
+  React.useEffect(() => {
+    const stored = localStorage.getItem('user_detailed_profile');
+    if (stored) {
+      try {
+        setDetailedProfile(JSON.parse(stored));
+      } catch {}
+    } else {
+      setDetailedProfile(null);
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -124,7 +136,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-xs font-bold text-white block truncate">
                 {user ? `${user.first_name} ${user.last_name}` : 'Guest User'}
               </span>
-              <span className="text-[10px] text-mutedGray block capitalize tracking-wide font-space">{role || 'Guest'} Gateway</span>
+              <span className="text-[10px] text-mutedGray block capitalize tracking-wide font-space">
+                {role === 'recruiter' 
+                  ? `${detailedProfile?.companyName || 'Enterprise'} • Recruiter` 
+                  : `${detailedProfile?.preferredRole || 'Candidate'} Workspace`}
+              </span>
             </div>
           </div>
 
