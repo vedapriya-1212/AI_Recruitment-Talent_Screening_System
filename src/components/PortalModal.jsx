@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Building2, User, ArrowRight, ShieldCheck, Mail, Lock, Loader2 } from 'lucide-react';
+import { X, Building2, User, ArrowRight, ShieldCheck, Mail, Lock, Loader2, FileText, Globe, Star, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'sonner';
@@ -11,18 +11,41 @@ export default function PortalModal({ isOpen, onClose }) {
 
   const [activePortal, setActivePortal] = useState(null); // 'recruiter' | 'candidate' | null
   const [isSignUp, setIsSignUp] = useState(false);
+  const [signUpStep, setSignUpStep] = useState(1); // 1 | 2
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Detailed Form States
+  // Recruiter fields
+  const [companyName, setCompanyName] = useState('');
+  const [industry, setIndustry] = useState('Software');
+  const [companySize, setCompanySize] = useState('11-50');
+  const [jobTitle, setJobTitle] = useState('');
+
+  // Candidate fields
+  const [preferredRole, setPreferredRole] = useState('');
+  const [experienceLevel, setExperienceLevel] = useState('Mid-Level');
+  const [skills, setSkills] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
+
   const resetState = () => {
     setActivePortal(null);
     setIsSignUp(false);
+    setSignUpStep(1);
     setFullName('');
     setEmail('');
     setPassword('');
+    setCompanyName('');
+    setIndustry('Software');
+    setCompanySize('11-50');
+    setJobTitle('');
+    setPreferredRole('');
+    setExperienceLevel('Mid-Level');
+    setSkills('');
+    setGithubUrl('');
     setIsLoading(false);
   };
 
@@ -31,20 +54,15 @@ export default function PortalModal({ isOpen, onClose }) {
     onClose();
   };
 
-  const handleAutofill = (portal) => {
-    if (portal === 'recruiter') {
-      setEmail('recruiter@recruiter.com');
-      setPassword('NeuralRecruit2035!');
-      setIsSignUp(false);
-    } else {
-      setEmail('candidate@candidate.com');
-      setPassword('NeuralRecruit2035!');
-      setIsSignUp(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isSignUp && signUpStep === 1) {
+      // Transition to detailed form
+      setSignUpStep(2);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -54,7 +72,14 @@ export default function PortalModal({ isOpen, onClose }) {
         const lastName = names.slice(1).join(' ') || '';
 
         await signup(email, password, firstName, lastName, activePortal);
-        toast.success(`Welcome to the ${activePortal} portal!`);
+
+        // Save detailed profile data locally for mock representation
+        const detailedProfile = activePortal === 'recruiter'
+          ? { companyName, industry, companySize, jobTitle }
+          : { preferredRole, experienceLevel, skills, githubUrl };
+        localStorage.setItem('user_detailed_profile', JSON.stringify(detailedProfile));
+
+        toast.success(`Account fully set up! Welcome to the ${activePortal} workspace.`);
       } else {
         await login(email, password);
         toast.success('Access Unlocked successfully!');
@@ -205,144 +230,325 @@ export default function PortalModal({ isOpen, onClose }) {
                     </p>
 
                     {/* Premium Sliding Segmented Switcher */}
-                    <div className="flex p-1 bg-white/5 border border-white/10 rounded-xl max-w-[280px] mx-auto relative shadow-inner">
-                      <button
-                        type="button"
-                        onClick={() => setIsSignUp(false)}
-                        className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-wider font-space rounded-lg transition-all duration-300 relative z-10 cursor-pointer ${
-                          !isSignUp 
-                            ? 'text-[#030712]' 
-                            : 'text-mutedGray hover:text-white'
-                        }`}
-                      >
-                        Sign In
-                        {!isSignUp && (
-                          <motion.div
-                            layoutId="activeTabGlow"
-                            className={`absolute inset-0 rounded-lg -z-10 ${
-                              activePortal === 'recruiter' ? 'bg-primaryGlow' : 'bg-secondaryGlow'
-                            }`}
-                            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                          />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsSignUp(true)}
-                        className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-wider font-space rounded-lg transition-all duration-300 relative z-10 cursor-pointer ${
-                          isSignUp 
-                            ? 'text-[#030712]' 
-                            : 'text-mutedGray hover:text-white'
-                        }`}
-                      >
-                        Sign Up
-                        {isSignUp && (
-                          <motion.div
-                            layoutId="activeTabGlow"
-                            className={`absolute inset-0 rounded-lg -z-10 ${
-                              activePortal === 'recruiter' ? 'bg-primaryGlow' : 'bg-secondaryGlow'
-                            }`}
-                            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                          />
-                        )}
-                      </button>
-                    </div>
+                    {(!isSignUp || signUpStep === 1) && (
+                      <div className="flex p-1 bg-white/5 border border-white/10 rounded-xl max-w-[280px] mx-auto relative shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => setIsSignUp(false)}
+                          className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-wider font-space rounded-lg transition-all duration-300 relative z-10 cursor-pointer ${
+                            !isSignUp 
+                              ? 'text-[#030712]' 
+                              : 'text-mutedGray hover:text-white'
+                          }`}
+                        >
+                          Sign In
+                          {!isSignUp && (
+                            <motion.div
+                              layoutId="activeTabGlow"
+                              className={`absolute inset-0 rounded-lg -z-10 ${
+                                activePortal === 'recruiter' ? 'bg-primaryGlow' : 'bg-secondaryGlow'
+                              }`}
+                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                            />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsSignUp(true)}
+                          className={`flex-1 py-2 text-[10px] font-extrabold uppercase tracking-wider font-space rounded-lg transition-all duration-300 relative z-10 cursor-pointer ${
+                            isSignUp 
+                              ? 'text-[#030712]' 
+                              : 'text-mutedGray hover:text-white'
+                          }`}
+                        >
+                          Sign Up
+                          {isSignUp && (
+                            <motion.div
+                              layoutId="activeTabGlow"
+                              className={`absolute inset-0 rounded-lg -z-10 ${
+                                activePortal === 'recruiter' ? 'bg-primaryGlow' : 'bg-secondaryGlow'
+                              }`}
+                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                            />
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                    {isSignUp && (
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Full Name</label>
-                        <div className="relative">
-                          <User className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
-                          <input
-                            type="text"
-                            required
-                            disabled={isLoading}
-                            value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
-                            placeholder="John Doe"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
-                          />
+                    {isSignUp && signUpStep === 2 ? (
+                      // STEP 2: DETAILED DATA FOR FIRST-TIME SIGNUP
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-mutedGray font-space">Step 2: Workspace Profiling</span>
+                          <button
+                            type="button"
+                            onClick={() => setSignUpStep(1)}
+                            className="text-[9px] text-primaryGlow hover:text-white uppercase tracking-wider font-space cursor-pointer bg-transparent border-none outline-none"
+                          >
+                            ← Back to credentials
+                          </button>
                         </div>
+
+                        {activePortal === 'recruiter' ? (
+                          <>
+                            {/* RECRUITER DETAILED FORM */}
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Company Name</label>
+                              <div className="relative">
+                                <Building2 className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                <input
+                                  type="text"
+                                  required
+                                  disabled={isLoading}
+                                  value={companyName}
+                                  onChange={(e) => setCompanyName(e.target.value)}
+                                  placeholder="e.g. Neural Technologies Inc."
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Your Corporate Title</label>
+                              <div className="relative">
+                                <FileText className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                <input
+                                  type="text"
+                                  required
+                                  disabled={isLoading}
+                                  value={jobTitle}
+                                  onChange={(e) => setJobTitle(e.target.value)}
+                                  placeholder="e.g. Lead Talent Officer"
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Industry</label>
+                                <div className="relative">
+                                  <Globe className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                  <select
+                                    disabled={isLoading}
+                                    value={industry}
+                                    onChange={(e) => setIndustry(e.target.value)}
+                                    className="w-full bg-[#071021] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                  >
+                                    <option value="Software">Software / Tech</option>
+                                    <option value="AI/ML">AI / Machine Learning</option>
+                                    <option value="Finance">Finance / Fintech</option>
+                                    <option value="Healthcare">Healthcare</option>
+                                    <option value="E-Commerce">E-Commerce</option>
+                                    <option value="Other">Other Sector</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Company Size</label>
+                                <div className="relative">
+                                  <Layers className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                  <select
+                                    disabled={isLoading}
+                                    value={companySize}
+                                    onChange={(e) => setCompanySize(e.target.value)}
+                                    className="w-full bg-[#071021] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                  >
+                                    <option value="1-10">1-10 Employees</option>
+                                    <option value="11-50">11-50 Employees</option>
+                                    <option value="51-200">51-200 Employees</option>
+                                    <option value="201-1000">201-1000 Employees</option>
+                                    <option value="1000+">1000+ Employees</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* CANDIDATE DETAILED FORM */}
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Preferred Job Title</label>
+                              <div className="relative">
+                                <FileText className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                <input
+                                  type="text"
+                                  required
+                                  disabled={isLoading}
+                                  value={preferredRole}
+                                  onChange={(e) => setPreferredRole(e.target.value)}
+                                  placeholder="e.g. Senior Frontend Engineer"
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-secondaryGlow focus:ring-1 focus:ring-secondaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Portfolio / GitHub Link</label>
+                              <div className="relative">
+                                <Globe className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                <input
+                                  type="url"
+                                  required
+                                  disabled={isLoading}
+                                  value={githubUrl}
+                                  onChange={(e) => setGithubUrl(e.target.value)}
+                                  placeholder="https://github.com/yourusername"
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-secondaryGlow focus:ring-1 focus:ring-secondaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Core Skills (Comma separated)</label>
+                              <div className="relative">
+                                <Star className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                <input
+                                  type="text"
+                                  required
+                                  disabled={isLoading}
+                                  value={skills}
+                                  onChange={(e) => setSkills(e.target.value)}
+                                  placeholder="e.g. React, TypeScript, Node.js"
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-secondaryGlow focus:ring-1 focus:ring-secondaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Experience Level</label>
+                              <div className="relative">
+                                <Layers className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                                <select
+                                  disabled={isLoading}
+                                  value={experienceLevel}
+                                  onChange={(e) => setExperienceLevel(e.target.value)}
+                                  className="w-full bg-[#071021] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-secondaryGlow focus:ring-1 focus:ring-secondaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                                >
+                                  <option value="Intern">Intern / Student</option>
+                                  <option value="Junior">Junior Level (1-2 yrs)</option>
+                                  <option value="Mid-Level">Mid-Level (3-5 yrs)</option>
+                                  <option value="Senior">Senior Level (5-8 yrs)</option>
+                                  <option value="Lead">Lead / Architect (8+ yrs)</option>
+                                </select>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className={`w-full py-3.5 mt-4 rounded-xl font-bold text-xs flex items-center justify-center transition-all duration-300 relative overflow-hidden group shadow-lg cursor-pointer font-space uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed ${
+                            activePortal === 'recruiter'
+                              ? 'bg-primaryGlow text-[#030712] shadow-primaryGlow/10 hover:shadow-primaryGlow/25'
+                              : 'bg-secondaryGlow text-white shadow-secondaryGlow/10 hover:shadow-secondaryGlow/25'
+                          }`}
+                        >
+                          {isLoading ? (
+                            <>
+                              <span>Registering Workspace...</span>
+                              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                            </>
+                          ) : (
+                            <>
+                              <span>Finalize Setup & Connect</span>
+                              <ShieldCheck className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </button>
                       </div>
+                    ) : (
+                      // STEP 1: INITIAL CREDENTIALS (OR LOGIN)
+                      <>
+                        {isSignUp && (
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Full Name</label>
+                            <div className="relative">
+                              <User className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                              <input
+                                type="text"
+                                required
+                                disabled={isLoading}
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                                placeholder="John Doe"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Email Address</label>
+                          <div className="relative">
+                            <Mail className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                            <input
+                              type="email"
+                              required
+                              disabled={isLoading}
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder={activePortal === 'recruiter' ? 'recruiter@recruiter.com' : 'candidate@candidate.com'}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Access Key / Password</label>
+                          <div className="relative">
+                            <Lock className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
+                            <input
+                              type="password"
+                              required
+                              disabled={isLoading}
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className={`w-full py-3.5 mt-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all duration-300 relative overflow-hidden group shadow-lg cursor-pointer font-space uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed ${
+                            activePortal === 'recruiter'
+                              ? 'bg-primaryGlow text-[#030712] shadow-primaryGlow/10 hover:shadow-primaryGlow/25'
+                              : 'bg-secondaryGlow text-white shadow-secondaryGlow/10 hover:shadow-secondaryGlow/25'
+                          }`}
+                        >
+                          {isLoading ? (
+                            <>
+                              <span>Processing...</span>
+                              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                            </>
+                          ) : (
+                            <>
+                              <span>{isSignUp ? 'Next: Workspace Details' : 'Unlock Access'}</span>
+                              <ShieldCheck className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </button>
+                      </>
                     )}
-
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Email Address</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
-                        <input
-                          type="email"
-                          required
-                          disabled={isLoading}
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder={activePortal === 'recruiter' ? 'recruiter@recruiter.com' : 'candidate@candidate.com'}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Access Key / Password</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-[13px] w-4 h-4 text-mutedGray" />
-                        <input
-                          type="password"
-                          required
-                          disabled={isLoading}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-outfit disabled:opacity-50"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Autofill Demo Credentials Helper */}
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleAutofill(activePortal)}
-                        disabled={isLoading}
-                        className="text-[10px] font-bold uppercase tracking-wider text-primaryGlow hover:text-white transition-all duration-200 cursor-pointer font-space bg-transparent border-none outline-none"
-                      >
-                        ⚡ Autofill Demo {activePortal === 'recruiter' ? 'Recruiter' : 'Candidate'} Credentials
-                      </button>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className={`w-full py-3.5 mt-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all duration-300 relative overflow-hidden group shadow-lg cursor-pointer font-space uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed ${
-                        activePortal === 'recruiter'
-                          ? 'bg-primaryGlow text-[#030712] shadow-primaryGlow/10 hover:shadow-primaryGlow/25'
-                          : 'bg-secondaryGlow text-white shadow-secondaryGlow/10 hover:shadow-secondaryGlow/25'
-                      }`}
-                    >
-                      {isLoading ? (
-                        <>
-                          <span>Authenticating...</span>
-                          <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                        </>
-                      ) : (
-                        <>
-                          <span>{isSignUp ? 'Launch Workspace' : 'Unlock Access'}</span>
-                          <ShieldCheck className="w-4 h-4 ml-2" />
-                        </>
-                      )}
-                    </button>
                   </form>
 
-                  <div className="text-center mt-6">
-                    <button
-                      onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-xs text-mutedGray hover:text-white transition-all duration-200 cursor-pointer font-outfit"
-                    >
-                      {isSignUp ? 'Already connected? Unlock access' : 'Request gateway access / Register'}
-                    </button>
-                  </div>
+                  {(!isSignUp || signUpStep === 1) && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => setIsSignUp(!isSignUp)}
+                        className="text-xs text-mutedGray hover:text-white transition-all duration-200 cursor-pointer font-outfit"
+                      >
+                        {isSignUp ? 'Already connected? Unlock access' : 'Request gateway access / Register'}
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
