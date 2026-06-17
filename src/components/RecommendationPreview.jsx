@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Bot, Terminal, CheckCircle2, User, RefreshCw } from 'lucide-react';
+import { Bot, Terminal } from 'lucide-react';
 
 export default function RecommendationPreview() {
   const containerRef = useRef(null);
@@ -9,18 +9,19 @@ export default function RecommendationPreview() {
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [gaugeValue, setGaugeValue] = useState(0);
 
-  const fullText = `[AI ENGINE INITIALIZED]...
-[INGESTING CORE DATA] Candidate: Rahul Sharma
-[PROCESSING MATCH SCORES] Core Alignment: 96%
+  const fullText = `[SYS LOG] INITIALIZING RESUME INGESTION MODULES...
+[SYS LOG] FILE: Resume_LeadSoftwareEngineer.pdf
+[SYS LOG] RUNNING DEEP COMPILING SCAN (SECTOR 4B)...
+[SYS LOG] MATCH COEFFICIENTS SYNTHESIZED: 96%
 
-[IDENTIFYING CANDIDATE STRENGTHS]:
-✓ React.js Developer - Expert level component architecture
-✓ Node.js Backend - Robust microservice development
-✓ Problem Solving - Top 4% algorithmic test score
-✓ Communication - Strong leadership & collaboration metrics
+[COMPILED EXPERTISE PROFILE]:
+✦ React.js Framework Architecture - Expert Level
+✦ Node.js & Distributed Systems - High Alignment
+✦ Algorithmic Complexity Index - Top 4%
+✦ Tech Leadership & Mentorship - Strong Metric
 
-[DECISION RECOMMENDATION]:
-👉 PROCEED TO TECHNICAL INTERVIEW IMMEDIATELY.`;
+[DECISION RECOMMENDATION ENGINE]:
+👉 DECISION: PROCEED TO TECHNICAL INTERVIEW IMMEDIATELY.`;
 
   // Typewriter effect triggered when in view
   useEffect(() => {
@@ -59,9 +60,9 @@ export default function RecommendationPreview() {
   }, [isInView]);
 
   return (
-    <section id="recommendation" className="relative py-28 overflow-hidden bg-darkBg">
-      {/* Glow */}
-      <div className="glow-orb w-[450px] h-[450px] bg-primaryCyan/10 top-10 right-10" />
+    <section id="recommendation" className="relative py-28 overflow-hidden bg-bgDark border-b border-white/5">
+      {/* Background Glow */}
+      <div className="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#4FFAF0]/5 filter blur-[120px] pointer-events-none" />
 
       <div ref={containerRef} className="max-w-4xl mx-auto px-6 relative z-10">
         
@@ -71,9 +72,9 @@ export default function RecommendationPreview() {
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="inline-block px-3 py-1 rounded-full glass-panel border-white/10 mb-4"
+            className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-4 font-space"
           >
-            <span className="text-xs font-bold text-primaryCyan uppercase tracking-wider">
+            <span className="text-xs font-bold text-primaryGlow uppercase tracking-wider">
               Talent Assessment Preview
             </span>
           </motion.div>
@@ -81,90 +82,89 @@ export default function RecommendationPreview() {
             initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-3xl sm:text-4xl font-black text-white"
+            className="text-3xl sm:text-4xl font-black text-white font-space uppercase"
           >
             Live AI <span className="gradient-text-cyan-purple">Decision Engine</span>
           </motion.h2>
-          <p className="text-mutedGray mt-3 text-sm max-w-md mx-auto">
-            Experience real-time candidate synthesis as raw resume files pass through the evaluation core.
+          <p className="text-mutedGray mt-3 text-sm max-w-md mx-auto font-outfit">
+            Witness active analysis as candidates pass through screening compiles and rank checks.
           </p>
         </div>
 
-        {/* Console Container */}
-        <div className="glass-panel rounded-xl border border-white/10 overflow-hidden shadow-2xl relative">
+        {/* Console mockup */}
+        <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden shadow-2xl relative">
           
-          {/* Console Top Header Bar */}
-          <div className="bg-white/3 px-4 py-3 flex items-center justify-between border-b border-white/5">
+          {/* Header Bar */}
+          <div className="bg-white/2 px-4 py-3.5 flex items-center justify-between border-b border-white/6">
             <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-primaryCyan" />
-              <span className="text-[11px] font-mono text-mutedGray uppercase tracking-widest">
+              <Terminal className="w-4 h-4 text-primaryGlow animate-pulse" />
+              <span className="text-[10px] font-bold font-space text-mutedGray uppercase tracking-widest">
                 Talent Intelligence Console v2.05
               </span>
             </div>
             <div className="flex gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-white/10" />
-              <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-              <span className="w-2.5 h-2.5 rounded-full bg-primaryCyan/20" />
+              <span className="w-2 h-2 rounded-full bg-white/10" />
+              <span className="w-2 h-2 rounded-full bg-white/15" />
+              <span className="w-2 h-2 rounded-full bg-primaryGlow/20" />
             </div>
           </div>
 
-          {/* Console Content Area */}
-          <div className="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-[#070b21]/80">
+          {/* Console Content */}
+          <div className="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch bg-[#071021]/50 backdrop-blur-md">
             
-            {/* Left side: Terminal Output (ChatGPT typing) */}
+            {/* Left Column: Code logs */}
             <div className="md:col-span-8 flex flex-col justify-start text-left min-h-[300px]">
-              <div className="font-mono text-xs sm:text-sm text-primaryCyan leading-relaxed whitespace-pre-line text-left flex-grow">
+              <div className="font-mono text-xs sm:text-[13px] text-primaryGlow leading-relaxed whitespace-pre-line text-left flex-grow">
                 {typedText}
                 {!isTypingComplete && <span className="typing-cursor" />}
               </div>
             </div>
 
-            {/* Right side: Match score metric visual */}
-            <div className="md:col-span-4 flex flex-col items-center justify-center p-6 rounded-xl bg-white/3 border border-white/5">
+            {/* Right Column: Radial Gauge */}
+            <div className="md:col-span-4 flex flex-col items-center justify-center p-6 rounded-xl bg-white/2 border border-white/5">
               
-              {/* Circular gauge */}
+              {/* Circular score gauge */}
               <div className="relative w-36 h-36 flex items-center justify-center">
-                {/* SVG Ring Background */}
+                {/* SVG Ring */}
                 <svg className="w-full h-full transform -rotate-90">
                   <circle
                     cx="72"
                     cy="72"
                     r="60"
                     fill="transparent"
-                    stroke="rgba(255, 255, 255, 0.04)"
-                    strokeWidth="8"
+                    stroke="rgba(255, 255, 255, 0.03)"
+                    strokeWidth="7"
                   />
-                  {/* Active SVG Ring */}
                   <motion.circle
                     cx="72"
                     cy="72"
                     r="60"
                     fill="transparent"
-                    stroke="#00F5D4"
-                    strokeWidth="8"
+                    stroke="#4FFAF0"
+                    strokeWidth="7"
                     strokeDasharray={2 * Math.PI * 60}
                     strokeDashoffset={2 * Math.PI * 60 * (1 - gaugeValue / 100)}
-                    className="glow-cyan-filter"
+                    className="glow-primary-filter"
                   />
                 </svg>
 
-                {/* Score Number inside ring */}
+                {/* Text inside ring */}
                 <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-3xl font-black text-white">{gaugeValue}%</span>
-                  <span className="text-[9px] font-bold text-mutedGray uppercase tracking-widest">
+                  <span className="text-3xl font-black text-white font-space">{gaugeValue}%</span>
+                  <span className="text-[9px] font-black text-mutedGray uppercase tracking-widest font-space mt-0.5">
                     Match Index
                   </span>
                 </div>
               </div>
 
-              {/* Match Card Sub-details */}
+              {/* Subdetails */}
               <div className="mt-6 text-center space-y-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primaryCyan/10 text-primaryCyan border border-primaryCyan/20 text-[10px] font-bold">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primaryGlow/10 text-primaryGlow border border-primaryGlow/25 text-[9px] font-black uppercase tracking-wider font-space">
                   <Bot className="w-3.5 h-3.5" />
                   <span>Verified Match</span>
                 </div>
-                <p className="text-xs text-white font-semibold">Rahul Sharma</p>
-                <p className="text-[10px] text-mutedGray">Lead Software Engineer candidate</p>
+                <p className="text-xs text-white font-bold font-space uppercase tracking-wide">Rahul Sharma</p>
+                <p className="text-[10px] text-mutedGray font-outfit">Lead Software Engineer candidate</p>
               </div>
 
             </div>

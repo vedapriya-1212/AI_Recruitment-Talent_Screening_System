@@ -25,18 +25,18 @@ const LinkedinIcon = (props) => (
 
 export default function Footer() {
   return (
-    <footer className="relative bg-[#03050f] border-t border-white/5 py-12">
+    <footer className="relative bg-[#030712] border-t border-white/5 py-12 font-outfit">
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-8">
         
         {/* Left: Logo & Info */}
         <div className="flex flex-col items-center md:items-start text-center md:text-left">
           <a href="#" className="flex items-center gap-2.5 group mb-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primaryCyan to-secondaryPurple p-[1.5px]">
-              <div className="w-full h-full bg-[#050816] rounded-[7px] flex items-center justify-center text-primaryCyan">
-                <Cpu className="w-4 h-4 text-primaryCyan" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primaryGlow to-secondaryGlow p-[1.5px]">
+              <div className="w-full h-full bg-[#030712] rounded-[7px] flex items-center justify-center text-primaryGlow">
+                <Cpu className="w-4 h-4 text-primaryGlow" />
               </div>
             </div>
-            <span className="text-lg font-black tracking-tight text-white">
+            <span className="text-lg font-black tracking-tight text-white font-space">
               AI <span className="gradient-text-cyan-purple font-black">Recruit</span>
             </span>
           </a>
@@ -46,12 +46,12 @@ export default function Footer() {
         </div>
 
         {/* Center: Quick Links */}
-        <div className="flex flex-wrap justify-center gap-6 md:gap-8 text-xs font-semibold text-mutedGray">
-          <a href="#hero" className="hover:text-primaryCyan transition-colors">Home</a>
-          <a href="#features" className="hover:text-primaryCyan transition-colors">Features</a>
-          <a href="#workflow" className="hover:text-primaryCyan transition-colors">Workflow</a>
-          <a href="#recommendation" className="hover:text-primaryCyan transition-colors">Insights</a>
-          <a href="https://google.com" target="_blank" rel="noreferrer" className="hover:text-primaryCyan transition-colors">Privacy Policy</a>
+        <div className="flex flex-wrap justify-center gap-6 md:gap-8 text-xs font-semibold text-mutedGray uppercase tracking-wider font-space">
+          <a href="#hero" className="hover:text-primaryGlow transition-colors">Home</a>
+          <a href="#features" className="hover:text-primaryGlow transition-colors">Features</a>
+          <a href="#workflow" className="hover:text-primaryGlow transition-colors">Workflow</a>
+          <a href="#recommendation" className="hover:text-primaryGlow transition-colors">Insights</a>
+          <a href="https://google.com" target="_blank" rel="noreferrer" className="hover:text-primaryGlow transition-colors">Privacy</a>
         </div>
 
         {/* Right: Social & Copyright */}
@@ -61,7 +61,7 @@ export default function Footer() {
               href="https://twitter.com"
               target="_blank"
               rel="noreferrer"
-              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryCyan hover:bg-white/10 transition-all"
+              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryGlow hover:bg-white/10 transition-all cursor-pointer"
               aria-label="Twitter link"
             >
               <TwitterIcon className="w-4 h-4" />
@@ -70,7 +70,7 @@ export default function Footer() {
               href="https://github.com"
               target="_blank"
               rel="noreferrer"
-              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryCyan hover:bg-white/10 transition-all"
+              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryGlow hover:bg-white/10 transition-all cursor-pointer"
               aria-label="Github link"
             >
               <GithubIcon className="w-4 h-4" />
@@ -79,7 +79,7 @@ export default function Footer() {
               href="https://linkedin.com"
               target="_blank"
               rel="noreferrer"
-              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryCyan hover:bg-white/10 transition-all"
+              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryGlow hover:bg-white/10 transition-all cursor-pointer"
               aria-label="Linkedin link"
             >
               <LinkedinIcon className="w-4 h-4" />
@@ -88,7 +88,7 @@ export default function Footer() {
               href="https://discord.com"
               target="_blank"
               rel="noreferrer"
-              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryCyan hover:bg-white/10 transition-all"
+              className="p-2 rounded-full bg-white/5 text-mutedGray hover:text-primaryGlow hover:bg-white/10 transition-all cursor-pointer"
               aria-label="Discord link"
             >
               <MessageSquare className="w-4 h-4" />
