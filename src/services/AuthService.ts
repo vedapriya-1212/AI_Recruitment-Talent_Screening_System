@@ -17,8 +17,10 @@ class AuthService {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Authentication failed.');
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Authentication failed.');
+        (err as any).isApiResponse = true;
+        throw err;
       }
 
       const { token, user } = await res.json();
@@ -29,6 +31,11 @@ class AuthService {
       
       return user;
     } catch (err: any) {
+      // Proactively propagate real validation/auth errors to the UI
+      if (err.isApiResponse) {
+        throw err;
+      }
+
       console.warn('API login connection failed, running demo fallback:', err);
       // Run fallback for offline/demo environments
       const emailLower = email.toLowerCase();
@@ -83,8 +90,10 @@ class AuthService {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Registration failed.');
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Registration failed.');
+        (err as any).isApiResponse = true;
+        throw err;
       }
 
       const { token, user } = await res.json();
@@ -94,6 +103,11 @@ class AuthService {
       
       return user;
     } catch (err: any) {
+      // Proactively propagate real validation/auth errors to the UI
+      if (err.isApiResponse) {
+        throw err;
+      }
+
       console.warn('API signup connection failed, running demo fallback:', err);
       const userProfile: UserProfile = {
         id: `mock-${role}-${Math.random().toString(36).substr(2, 9)}`,
@@ -125,12 +139,23 @@ class AuthService {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!res.ok) throw new Error('Token verification failed');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Token verification failed');
+        (err as any).isApiResponse = true;
+        throw err;
+      }
 
       const user = await res.json();
       localStorage.setItem('demo_user_session', JSON.stringify(user));
       return user;
-    } catch (err) {
+    } catch (err: any) {
+      if (err.isApiResponse) {
+        // Clear token if invalid on server
+        localStorage.removeItem('ats_token');
+        localStorage.removeItem('demo_user_session');
+        return null;
+      }
       console.warn('API getCurrentUser failed, running cache fallback:', err);
       const stored = localStorage.getItem('demo_user_session');
       return stored ? JSON.parse(stored) : null;
