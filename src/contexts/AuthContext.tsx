@@ -5,7 +5,7 @@ interface AuthContextType {
   user: UserProfile | null;
   role: 'candidate' | 'recruiter' | null;
   loading: boolean;
-  login: (email: string, password_hash: string) => Promise<UserProfile>;
+  login: (email: string, password_hash: string, selectedRole?: 'candidate' | 'recruiter') => Promise<UserProfile>;
   signup: (email: string, password_hash: string, first_name: string, last_name: string, role: 'candidate' | 'recruiter') => Promise<UserProfile>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -41,10 +41,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
-  const login = async (email: string, password_hash: string) => {
+  const login = async (email: string, password_hash: string, selectedRole?: 'candidate' | 'recruiter') => {
     setLoading(true);
     try {
-      const profile = await AuthService.login(email, password_hash);
+      const profile = await AuthService.login(email, password_hash, selectedRole);
       setUser(profile);
       setRole(profile.role);
       return profile;

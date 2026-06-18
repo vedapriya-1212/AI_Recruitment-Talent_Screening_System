@@ -66,12 +66,13 @@ export default function PortalModal({ isOpen, onClose }) {
     setIsLoading(true);
 
     try {
+      let profile;
       if (isSignUp) {
         const names = fullName.trim().split(/\s+/);
         const firstName = names[0] || '';
         const lastName = names.slice(1).join(' ') || '';
 
-        await signup(email, password, firstName, lastName, activePortal);
+        profile = await signup(email, password, firstName, lastName, activePortal);
 
         // Save detailed profile data locally for mock representation
         const detailedProfile = activePortal === 'recruiter'
@@ -81,13 +82,13 @@ export default function PortalModal({ isOpen, onClose }) {
 
         toast.success(`Account fully set up! Welcome to the ${activePortal} workspace.`);
       } else {
-        await login(email, password);
+        profile = await login(email, password, activePortal);
         toast.success('Access Unlocked successfully!');
       }
 
       handleClose();
-      // Redirect based on the portal
-      if (activePortal === 'recruiter') {
+      // Redirect based on the user's actual database profile role
+      if (profile && profile.role === 'recruiter') {
         navigate('/recruiter/dashboard');
       } else {
         navigate('/candidate/dashboard');

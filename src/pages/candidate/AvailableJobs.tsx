@@ -1,35 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Briefcase, Calendar, MapPin, DollarSign, Filter, ArrowRight, X, Sparkles, CheckCircle2 } from 'lucide-react';
-import { apiClient } from '../../api/apiClient';
+import { Search, Briefcase, Calendar, MapPin, DollarSign, Filter, ArrowRight, X, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
+import { useApplication } from '../../contexts/ApplicationContext';
 import { JobPost } from '../../api/mockData';
 import { toast } from 'sonner';
 
 export default function AvailableJobs() {
-  const [jobs, setJobs] = useState<JobPost[]>([]);
+  const { jobs, myApplications, applyForJob, loading } = useApplication();
   const [selectedJob, setSelectedJob] = useState<JobPost | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSkill, setSelectedSkill] = useState('');
   const [selectedExp, setSelectedExp] = useState('');
-  const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
+  const [applyingId, setApplyingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadJobs() {
-      const data = await apiClient.getJobs();
-      setJobs(data);
-    }
-    loadJobs();
+  // Derive applied job IDs from live context
+  const appliedJobIds = useMemo(() => myApplications.map(a => a.jobId), [myApplications]);
 
-    // Load already applied jobs from local storage or memory
-    const saved = localStorage.getItem('applied_jobs_list');
-    if (saved) {
-      try {
-        setAppliedJobIds(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
-
-  const handleApply = (job: JobPost) => {
+  const handleApply = async (job: JobPost) => {
     if (appliedJobIds.includes(job.id)) {
       toast.warning('Already Applied', {
         description: `You have already submitted an application for the ${job.title} position.`,
@@ -37,17 +24,21 @@ export default function AvailableJobs() {
       return;
     }
 
-    const updated = [...appliedJobIds, job.id];
-    setAppliedJobIds(updated);
-    localStorage.setItem('applied_jobs_list', JSON.stringify(updated));
-
-    // Simulate appending to the applications store
-    toast.success('Application Submitted!', {
-      description: `Your profile and parsed resume have been synced to the ${job.title} hiring funnel.`,
-    });
-
-    if (selectedJob?.id === job.id) {
-      setSelectedJob(null);
+    setApplyingId(job.id);
+    try {
+      await applyForJob(job.id);
+      toast.success('Application Submitted!', {
+        description: `Your profile has been synced to the ${job.title} hiring funnel.`,
+      });
+      if (selectedJob?.id === job.id) {
+        setSelectedJob(null);
+      }
+    } catch (err: any) {
+      if (!err?.message?.includes('duplicate') && !err?.message?.includes('unique')) {
+        toast.error('Failed to submit application. Please try again.');
+      }
+    } finally {
+      setApplyingId(null);
     }
   };
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ClipboardList, Calendar, Building, CheckCircle2, ChevronRight, XCircle, AlertCircle, Clock } from 'lucide-react';
-import { apiClient } from '../../api/apiClient';
-import { JobPost } from '../../api/mockData';
+import { ClipboardList, Calendar, Building, CheckCircle2, ChevronRight, XCircle, AlertCircle, Clock, Loader2, Briefcase } from 'lucide-react';
+import { useApplication } from '../../contexts/ApplicationContext';
+import { useNavigate } from 'react-router-dom';
 
 interface ApplicationItem {
   id: string;
@@ -10,65 +10,22 @@ interface ApplicationItem {
   jobTitle: string;
   company: string;
   appliedDate: string;
-  status: 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview Scheduled' | 'Selected' | 'Rejected';
+  status: string;
 }
 
-const defaultApplications: ApplicationItem[] = [
-  {
-    id: 'app-1',
-    jobId: 'job-1',
-    jobTitle: 'Senior React Architect',
-    company: 'AI Recruit Corp',
-    appliedDate: '2026-06-15',
-    status: 'Interview Scheduled',
-  },
-  {
-    id: 'app-2',
-    jobId: 'job-3',
-    jobTitle: 'Security Operations Lead',
-    company: 'ZeroTrust Lab',
-    appliedDate: '2026-06-16',
-    status: 'Shortlisted',
-  },
-];
-
 export default function MyApplications() {
-  const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const { myApplications, loading } = useApplication();
+  const navigate = useNavigate();
   const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null);
 
+  // Set first app as selected when data loads
   useEffect(() => {
-    async function loadApplications() {
-      // Build dynamic list combining local storage applied lists and static mock defaults
-      const stored = localStorage.getItem('applied_jobs_list');
-      let appliedIds: string[] = [];
-      if (stored) {
-        try {
-          appliedIds = JSON.parse(stored);
-        } catch {}
-      }
-
-      const allJobs = await apiClient.getJobs();
-      
-      const dynamicApps: ApplicationItem[] = appliedIds.map((jobId, idx) => {
-        const job = allJobs.find((j) => j.id === jobId);
-        return {
-          id: `app-dynamic-${idx}`,
-          jobId,
-          jobTitle: job?.title || 'Custom Requirement',
-          company: 'AI Recruitment Partner',
-          appliedDate: new Date().toISOString().split('T')[0],
-          status: 'Applied',
-        };
-      });
-
-      const merged = [...dynamicApps, ...defaultApplications];
-      setApplications(merged);
-      if (merged.length > 0) {
-        setSelectedApp(merged[0]);
-      }
+    if (myApplications.length > 0 && !selectedApp) {
+      setSelectedApp(myApplications[0] as ApplicationItem);
     }
-    loadApplications();
-  }, []);
+  }, [myApplications]);
+
+  const applications = myApplications as ApplicationItem[];
 
   const getStatusBadge = (status: ApplicationItem['status']) => {
     switch (status) {
@@ -135,6 +92,28 @@ export default function MyApplications() {
         </p>
       </div>
 
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <Loader2 className="w-10 h-10 text-primaryGlow animate-spin" />
+          <p className="text-xs font-bold uppercase tracking-widest text-primaryGlow font-space animate-pulse">Loading Applications...</p>
+        </div>
+      ) : applications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-5 rounded-2xl glass-panel border border-white/5">
+          <Briefcase className="w-12 h-12 text-mutedGray/40" />
+          <div className="text-center">
+            <h3 className="text-sm font-bold uppercase tracking-wider font-space text-white">No Applications Yet</h3>
+            <p className="text-xs text-mutedGray font-outfit mt-1">You haven't applied to any jobs. Start by browsing available positions.</p>
+          </div>
+          <button
+            onClick={() => navigate('/candidate/jobs')}
+            className="px-5 py-2.5 rounded-xl bg-primaryGlow text-black text-xs font-bold uppercase tracking-wider font-space hover:scale-105 transition-transform cursor-pointer"
+          >
+            Browse Open Jobs
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && applications.length > 0 && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Applications Table (Col span 7) */}
         <div className="lg:col-span-7 space-y-4">
@@ -246,6 +225,7 @@ export default function MyApplications() {
           )}
         </div>
       </div>
+      )}
     </motion.div>
   );
 }

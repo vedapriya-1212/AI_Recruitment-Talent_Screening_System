@@ -1,17 +1,27 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApplication } from '../../contexts/ApplicationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { PlusCircle, Users, Activity, FileText, ArrowRight } from 'lucide-react';
+import { PlusCircle, Users, Activity, FileText, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function RecruiterDashboard() {
-  const { jobs, candidates, interviews } = useApplication();
+  const { jobs, candidates, interviews, loading } = useApplication();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Metrics
-  const totalJobs = jobs.length;
+  const totalJobs = jobs.filter(j => j.status === 'published').length;
   const activeCandidates = candidates.length;
   const pendingInterviews = interviews.filter(i => i.status !== 'Completed' && i.status !== 'Cancelled').length;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <Loader2 className="w-10 h-10 text-primaryGlow animate-spin" />
+        <p className="text-xs font-bold uppercase tracking-widest text-primaryGlow font-space animate-pulse">Loading Workspace...</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -24,7 +34,7 @@ export default function RecruiterDashboard() {
         <div>
           <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">Recruiter Workspace</h2>
           <p className="text-mutedGray text-xs font-outfit mt-1">
-            System overview and autonomous workflow diagnostics.
+            Welcome back, <span className="text-primaryGlow font-bold">{user?.first_name}</span>. System overview and autonomous workflow diagnostics.
           </p>
         </div>
         <button
@@ -83,41 +93,49 @@ export default function RecruiterDashboard() {
           <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">Active Requirements</h4>
           
           <div className="flex flex-col gap-4">
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                className="p-5.5 rounded-2xl glass-panel bg-white/2 border border-white/5 hover:border-white/10 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              >
-                <div>
-                  <h5 className="text-base font-bold text-white font-space uppercase tracking-wide">{job.title}</h5>
-                  <span className="text-[10px] text-mutedGray uppercase tracking-wider font-space mt-1 block">
-                    {job.department} • {job.location}
-                  </span>
-                  
-                  {/* Performance Indicators */}
-                  <div className="flex gap-4 mt-3">
-                    <span className="text-[10px] font-bold text-primaryGlow font-space uppercase">Score: {job.optimizationScore}%</span>
-                    <span className="text-[10px] font-bold text-mutedGray font-space uppercase">Applications: {candidates.filter(c => c.jobId === job.id).length}</span>
+            {jobs.length === 0 ? (
+              <div className="p-16 rounded-2xl glass-panel text-center bg-[#071021]/30 border border-white/5 flex flex-col items-center justify-center gap-4">
+                <FileText className="w-10 h-10 text-mutedGray" />
+                <h4 className="text-sm font-bold uppercase tracking-wider font-space text-white">No Active Requirements</h4>
+                <p className="text-xs text-mutedGray font-outfit max-w-xs leading-relaxed">No job posts yet. Create your first requirement to start the hiring pipeline.</p>
+                <button onClick={() => navigate('/recruiter/create-job')} className="px-5 py-2.5 rounded-xl bg-primaryGlow text-black text-xs font-bold uppercase tracking-wider font-space hover:scale-105 transition-transform cursor-pointer">
+                  Publish First Job
+                </button>
+              </div>
+            ) : (
+              jobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="p-5.5 rounded-2xl glass-panel bg-white/2 border border-white/5 hover:border-white/10 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                >
+                  <div>
+                    <h5 className="text-base font-bold text-white font-space uppercase tracking-wide">{job.title}</h5>
+                    <span className="text-[10px] text-mutedGray uppercase tracking-wider font-space mt-1 block">
+                      {job.department} • {job.location}
+                    </span>
+                    <div className="flex gap-4 mt-3">
+                      <span className="text-[10px] font-bold text-primaryGlow font-space uppercase">Score: {job.optimizationScore}%</span>
+                      <span className="text-[10px] font-bold text-mutedGray font-space uppercase">Applications: {candidates.filter(c => c.jobId === job.id).length}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      to="/recruiter/applications"
+                      className="px-4 py-2.5 rounded-lg border border-white/6 hover:border-primaryGlow/30 text-[10px] font-bold uppercase tracking-wider font-space text-white hover:text-primaryGlow transition-all"
+                    >
+                      View Pipeline
+                    </Link>
+                    <Link
+                      to="/recruiter/rankings"
+                      className="p-2.5 rounded-lg bg-white/5 border border-white/8 hover:bg-white/10 hover:border-white/15 text-white transition-all"
+                      title="Rankings"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <Link
-                    to="/recruiter/applications"
-                    className="px-4 py-2.5 rounded-lg border border-white/6 hover:border-primaryGlow/30 text-[10px] font-bold uppercase tracking-wider font-space text-white hover:text-primaryGlow transition-all"
-                  >
-                    View Pipeline
-                  </Link>
-                  <Link
-                    to="/recruiter/rankings"
-                    className="p-2.5 rounded-lg bg-white/5 border border-white/8 hover:bg-white/10 hover:border-white/15 text-white transition-all"
-                    title="Rankings"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

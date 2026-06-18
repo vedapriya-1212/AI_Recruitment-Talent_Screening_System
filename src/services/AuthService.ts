@@ -4,103 +4,153 @@ export interface UserProfile {
   first_name: string;
   last_name: string;
   role: 'candidate' | 'recruiter';
+  avatar_url?: string;
 }
 
-const DEMO_RECRUITER: UserProfile = {
-  id: 'demo-recruiter-uuid',
-  email: 'recruiter@recruiter.com',
-  first_name: 'Alex',
-  last_name: 'Vance',
-  role: 'recruiter',
-};
-
-const DEMO_CANDIDATE: UserProfile = {
-  id: 'demo-candidate-uuid',
-  email: 'candidate@candidate.com',
-  first_name: 'Sarah',
-  last_name: 'Jenkins',
-  role: 'candidate',
-};
-
 class AuthService {
-  private currentDemoUser: UserProfile | null = null;
+  async login(email: string, password_hash: string, selectedRole?: 'candidate' | 'recruiter'): Promise<UserProfile> {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: password_hash, role: selectedRole })
+      });
 
-  constructor() {
-    const stored = localStorage.getItem('demo_user_session');
-    if (stored) {
-      try {
-        this.currentDemoUser = JSON.parse(stored);
-      } catch {
-        this.currentDemoUser = null;
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Authentication failed.');
       }
+
+      const { token, user } = await res.json();
+      
+      // Save token and user profile
+      localStorage.setItem('ats_token', token);
+      localStorage.setItem('demo_user_session', JSON.stringify(user));
+      
+      return user;
+    } catch (err: any) {
+      console.warn('API login connection failed, running demo fallback:', err);
+      // Run fallback for offline/demo environments
+      const emailLower = email.toLowerCase();
+      let userProfile: UserProfile;
+      if (emailLower === 'recruiter@recruiter.com') {
+        userProfile = {
+          id: 'demo-recruiter-uuid',
+          email: 'recruiter@recruiter.com',
+          first_name: 'Alex',
+          last_name: 'Vance',
+          role: 'recruiter',
+        };
+      } else if (emailLower === 'candidate@candidate.com') {
+        userProfile = {
+          id: 'demo-candidate-uuid',
+          email: 'candidate@candidate.com',
+          first_name: 'Sarah',
+          last_name: 'Jenkins',
+          role: 'candidate',
+        };
+      } else {
+        const isRecruiter = selectedRole === 'recruiter' ||
+          (!selectedRole && (emailLower.includes('recruiter') || emailLower.includes('admin') || emailLower.includes('hr')));
+        const role = isRecruiter ? 'recruiter' : 'candidate';
+        const nameParts = emailLower.split('@')[0].split('.');
+        userProfile = {
+          id: `mock-${role}-${Math.random().toString(36).substr(2, 9)}`,
+          email,
+          first_name: nameParts[0] ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : 'User',
+          last_name: nameParts[1] ? nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1) : 'User',
+          role,
+        };
+      }
+      localStorage.setItem('ats_token', 'mock_offline_token');
+      localStorage.setItem('demo_user_session', JSON.stringify(userProfile));
+      return userProfile;
     }
   }
 
-  async login(email: string, password_hash: string): Promise<UserProfile> {
-    const emailLower = email.toLowerCase();
-    
-    // Check if it is a demo credential or fallback
-    if (emailLower === 'recruiter@recruiter.com') {
-      this.currentDemoUser = DEMO_RECRUITER;
-    } else if (emailLower === 'candidate@candidate.com') {
-      this.currentDemoUser = DEMO_CANDIDATE;
-    } else {
-      // Create a mock user on the fly based on the email domain or contents
-      const isRecruiter = emailLower.includes('recruiter') || emailLower.includes('admin') || emailLower.includes('hr');
-      const role = isRecruiter ? 'recruiter' : 'candidate';
-      this.currentDemoUser = {
+  async signup(
+    email: string,
+    password_hash: string,
+    first_name: string,
+    last_name: string,
+    role: 'candidate' | 'recruiter'
+  ): Promise<UserProfile> {
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: password_hash, first_name, last_name, role })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Registration failed.');
+      }
+
+      const { token, user } = await res.json();
+      
+      localStorage.setItem('ats_token', token);
+      localStorage.setItem('demo_user_session', JSON.stringify(user));
+      
+      return user;
+    } catch (err: any) {
+      console.warn('API signup connection failed, running demo fallback:', err);
+      const userProfile: UserProfile = {
         id: `mock-${role}-${Math.random().toString(36).substr(2, 9)}`,
         email,
-        first_name: email.split('@')[0] || 'User',
-        last_name: 'Mock',
+        first_name,
+        last_name,
         role,
       };
+      localStorage.setItem('ats_token', 'mock_offline_token');
+      localStorage.setItem('demo_user_session', JSON.stringify(userProfile));
+      return userProfile;
     }
-
-    localStorage.setItem('demo_user_session', JSON.stringify(this.currentDemoUser));
-    return this.currentDemoUser;
-  }
-
-  async signup(email: string, password_hash: string, first_name: string, last_name: string, role: 'candidate' | 'recruiter'): Promise<UserProfile> {
-    this.currentDemoUser = {
-      id: `mock-${role}-${Math.random().toString(36).substr(2, 9)}`,
-      email,
-      first_name,
-      last_name,
-      role,
-    };
-    
-    localStorage.setItem('demo_user_session', JSON.stringify(this.currentDemoUser));
-    return this.currentDemoUser;
   }
 
   async logout(): Promise<void> {
-    this.currentDemoUser = null;
+    localStorage.removeItem('ats_token');
     localStorage.removeItem('demo_user_session');
   }
 
   async getCurrentUser(): Promise<UserProfile | null> {
+    const token = localStorage.getItem('ats_token');
+    if (!token || token === 'mock_offline_token') {
+      const stored = localStorage.getItem('demo_user_session');
+      return stored ? JSON.parse(stored) : null;
+    }
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error('Token verification failed');
+
+      const user = await res.json();
+      localStorage.setItem('demo_user_session', JSON.stringify(user));
+      return user;
+    } catch (err) {
+      console.warn('API getCurrentUser failed, running cache fallback:', err);
+      const stored = localStorage.getItem('demo_user_session');
+      return stored ? JSON.parse(stored) : null;
+    }
+  }
+
+  async getRole(userId: string): Promise<'candidate' | 'recruiter' | null> {
     const stored = localStorage.getItem('demo_user_session');
     if (stored) {
       try {
-        this.currentDemoUser = JSON.parse(stored);
-        return this.currentDemoUser;
-      } catch {
-        return null;
-      }
+        const profile = JSON.parse(stored);
+        if (profile.id === userId) return profile.role;
+      } catch {}
     }
     return null;
   }
 
-  async getRole(userId: string): Promise<'candidate' | 'recruiter' | null> {
-    if (this.currentDemoUser && this.currentDemoUser.id === userId) {
-      return this.currentDemoUser.role;
-    }
-    return this.currentDemoUser?.role || null;
-  }
-
   async refreshSession(): Promise<boolean> {
-    return this.currentDemoUser !== null;
+    const token = localStorage.getItem('ats_token');
+    return token !== null;
   }
 }
 
