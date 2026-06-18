@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/apiClient';
 import { JobPost, CandidateProfile, InterviewEvent } from '../api/mockData';
 import { useNotifications } from './NotificationContext';
@@ -39,52 +39,72 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [myApplications, setMyApplications] = useState<CandidateApplication[]>([]);
   const [myInterviews, setMyInterviews] = useState<InterviewEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch candidate-specific data (my applications & my interviews)
+  // ── Candidate-only: fetch own applications & interviews ──────────────────
   const refreshMyData = useCallback(async () => {
-    if (!user) return;
+    if (!user || user.role !== 'candidate') return;
     try {
-      // Fetch candidate's own applications
       const apps = await apiClient.getCandidateApplications();
       setMyApplications(apps);
-
-      // Fetch candidate's own interviews from the backend via API client
-      const myInterviewData = await apiClient.getInterviews();
-      setMyInterviews(myInterviewData);
     } catch (err) {
       console.warn('refreshMyData failed:', err);
     }
   }, [user]);
 
-  const refreshAll = async () => {
+  // ── Recruiter-only: fetch all applications & interviews ──────────────────
+  const refreshRecruiterData = useCallback(async () => {
+    if (!user || user.role !== 'recruiter') return;
+    try {
+      const fetchedCandidates = await apiClient.getCandidates();
+      setCandidates(fetchedCandidates);
+    } catch (err) {
+      console.warn('refreshRecruiterData failed:', err);
+    }
+  }, [user]);
+
+  // ── Full refresh (jobs + role-specific data) ──────────────────────────────
+  const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [fetchedJobs, fetchedCandidates, fetchedInterviews] = await Promise.all([
-        apiClient.getJobs(),
-        apiClient.getCandidates(),
-        apiClient.getInterviews(),
-      ]);
+      const fetchedJobs = await apiClient.getJobs();
       setJobs(fetchedJobs);
-      setCandidates(fetchedCandidates);
-      setInterviews(fetchedInterviews);
+
+      if (user?.role === 'recruiter') {
+        await refreshRecruiterData();
+      } else if (user?.role === 'candidate') {
+        await refreshMyData();
+      }
     } catch (err) {
       console.error('Failed to load application datasets:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, refreshMyData, refreshRecruiterData]);
 
+  // ── Initial load when user changes ───────────────────────────────────────
   useEffect(() => {
-    refreshAll();
-  }, [user]);
-
-  // After main data loads, fetch candidate-specific data
-  useEffect(() => {
-    if (!loading && user?.role === 'candidate') {
-      refreshMyData();
+    if (user) {
+      refreshAll();
+    } else {
+      setLoading(false);
     }
-  }, [loading, user]);
+  }, [user?.id, user?.role]);
 
+  // ── Polling: candidates poll every 30s for status updates ────────────────
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (user?.role === 'candidate') {
+      pollRef.current = setInterval(() => {
+        refreshMyData();
+      }, 30000); // 30 seconds
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [user?.id, user?.role, refreshMyData]);
+
+  // ── CREATE JOB ────────────────────────────────────────────────────────────
   const createJob = async (jobData: Omit<JobPost, 'id' | 'created_at' | 'applicationsCount'>) => {
     try {
       const created = await apiClient.createJob(jobData);
@@ -101,18 +121,20 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  // ── UPDATE CANDIDATE STATUS (recruiter) ──────────────────────────────────
   const updateCandidateStatus = async (id: string, status: CandidateProfile['status']) => {
     try {
       const updated = await apiClient.updateCandidateStatus(id, status);
-      setCandidates((prev) => prev.map((c) => (c.id === id ? updated : c)));
-      
+      setCandidates((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
+
       let notifyType: 'info' | 'success' | 'warning' | 'error' = 'info';
       if (status === 'Selected') notifyType = 'success';
       if (status === 'Rejected') notifyType = 'error';
+      if (status === 'Shortlisted') notifyType = 'info';
 
       addNotification(
         'Candidate Status Updated',
-        `Candidate "${updated.name}" is now in phase "${status}".`,
+        `Candidate status updated to "${status}".`,
         notifyType
       );
       return updated;
@@ -122,6 +144,7 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  // ── SCHEDULE INTERVIEW ────────────────────────────────────────────────────
   const scheduleInterview = async (
     candidateId: string,
     candidateName: string,
@@ -148,21 +171,22 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  // ── APPLY FOR JOB (candidate) ─────────────────────────────────────────────
   const applyForJob = async (jobId: string) => {
     try {
       await apiClient.applyForJob(jobId);
-      // Refresh candidate's applications
+      // Immediately refresh candidate's application list from DB
       const apps = await apiClient.getCandidateApplications();
       setMyApplications(apps);
-      // Update job application count locally
-      setJobs(prev => prev.map(j => j.id === jobId 
-        ? { ...j, applicationsCount: (j.applicationsCount || 0) + 1 } 
-        : j
-      ));
+      // Bump job count locally for immediate UI feedback
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId ? { ...j, applicationsCount: (j.applicationsCount || 0) + 1 } : j
+        )
+      );
       addNotification('Application Submitted', 'Your application has been recorded successfully.', 'success');
     } catch (err: any) {
-      // Duplicate application error is OK
-      if (err?.message?.includes('duplicate') || err?.message?.includes('unique')) {
+      if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.message?.includes('already applied')) {
         addNotification('Already Applied', 'You have already applied for this position.', 'info');
       } else {
         addNotification('Application Failed', err?.message || 'Could not submit application.', 'error');

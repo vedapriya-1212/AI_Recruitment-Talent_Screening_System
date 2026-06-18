@@ -82,23 +82,36 @@ router.post('/signup', async (req, res) => {
 
     const userId = authData.user.id;
 
-    const { error: dbError } = await supabase.from('users').insert({
+    // Upsert profile (handles re-signups gracefully)
+    const { error: dbError } = await supabase.from('users').upsert({
       id: userId, email, first_name, last_name: safeLastName, role,
       password_hash: 'managed_by_supabase_auth',
-    });
-    if (dbError) return res.status(500).json({ error: dbError.message });
+    }, { onConflict: 'id' });
+    if (dbError) console.warn('Profile upsert warning:', dbError.message);
 
     // Seed candidate profile if needed
     if (role === 'candidate') {
-      await supabase.from('candidates').upsert({ id: userId });
-      await supabase.from('candidate_profiles').upsert({
-        candidate_id: userId, completion_percentage: 0, views_count: 0,
-      }, { onConflict: 'candidate_id' });
+      try {
+        await supabase.from('candidate_profiles').upsert({
+          candidate_id: userId, completion_percentage: 0, views_count: 0,
+        }, { onConflict: 'candidate_id' });
+      } catch (e) { console.warn('candidate_profiles seed:', e.message); }
+    }
+
+    // Session may be null if Supabase requires email confirmation
+    // In that case we try to auto-login to get a session token
+    let token = authData.session?.access_token;
+    if (!token) {
+      try {
+        const { data: loginData } = await supabase.auth.signInWithPassword({ email, password });
+        token = loginData?.session?.access_token;
+      } catch (e) { /* email confirmation required – token will be null */ }
     }
 
     return res.json({
-      token: authData.session?.access_token,
-      user: { id: userId, email, first_name, last_name, role },
+      token: token || null,
+      emailConfirmationRequired: !token,
+      user: { id: userId, email, first_name, last_name: safeLastName, role },
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

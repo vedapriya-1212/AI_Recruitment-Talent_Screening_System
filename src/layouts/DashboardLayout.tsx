@@ -64,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const items = role === 'recruiter' ? recruiterItems : candidateItems;
 
   return (
-    <div className="min-h-screen bg-[#030712] text-white flex flex-col md:flex-row relative">
+    <div className="h-screen bg-[#030712] text-white flex flex-col md:flex-row relative overflow-hidden">
       
       {/* Top Mobile Nav Bar */}
       <header className="md:hidden w-full px-6 py-4 flex items-center justify-between glass-panel border-b border-white/6 z-30 bg-[#071021]/80 backdrop-blur-md">
@@ -201,8 +201,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </AnimatePresence>
 
       {/* Dashboard Main Content Area */}
-      <main className="flex-grow md:h-screen md:overflow-y-auto p-6 md:p-10 z-10 relative">
-        <div className="max-w-6xl mx-auto w-full">
+      <main className="flex-1 h-full overflow-y-auto p-6 md:p-10 z-10 relative">
+        <div className="max-w-6xl mx-auto w-full pb-10">
           {children}
         </div>
       </main>

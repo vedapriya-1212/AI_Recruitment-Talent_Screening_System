@@ -96,9 +96,17 @@ class AuthService {
         throw err;
       }
 
-      const { token, user } = await res.json();
+      const result = await res.json();
+      const { token, user, emailConfirmationRequired } = result;
       
-      localStorage.setItem('ats_token', token);
+      // Store token if we have one; otherwise use a special marker
+      if (token) {
+        localStorage.setItem('ats_token', token);
+      } else if (emailConfirmationRequired) {
+        // No session yet — Supabase needs email confirmation
+        // Store a temp token so getCurrentUser() falls back to demo_user_session
+        localStorage.setItem('ats_token', 'pending_email_confirmation');
+      }
       localStorage.setItem('demo_user_session', JSON.stringify(user));
       
       return user;
@@ -129,7 +137,8 @@ class AuthService {
 
   async getCurrentUser(): Promise<UserProfile | null> {
     const token = localStorage.getItem('ats_token');
-    if (!token || token === 'mock_offline_token') {
+    // Treat offline/pending tokens as demo session fallback
+    if (!token || token === 'mock_offline_token' || token === 'pending_email_confirmation') {
       const stored = localStorage.getItem('demo_user_session');
       return stored ? JSON.parse(stored) : null;
     }

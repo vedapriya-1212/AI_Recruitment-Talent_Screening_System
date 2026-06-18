@@ -1,23 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApplication } from '../../contexts/ApplicationContext';
-import { motion } from 'framer-motion';
-import { Search, SlidersHorizontal, ArrowUpDown, Brain, Calendar } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, SlidersHorizontal, ArrowUpDown, Brain, Calendar, RefreshCw, Loader2, CheckCircle2, XCircle, Clock, Star } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Applications() {
-  const { candidates, jobs, updateCandidateStatus } = useApplication();
+  const { candidates, jobs, updateCandidateStatus, refreshAll, loading } = useApplication();
   const navigate = useNavigate();
 
-  // Filter & Sort States
   const [searchTerm, setSearchTerm] = useState('');
   const [jobFilter, setJobFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'match' | 'exp' | 'overall'>('match');
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshAll();
+    setRefreshing(false);
+    toast.success('Applications refreshed from database');
+  };
+
+  const handleStatusChange = async (candId: string, newStatus: string) => {
+    setUpdatingId(candId);
+    try {
+      await updateCandidateStatus(candId, newStatus as any);
+      toast.success(`Status updated to "${newStatus}"`);
+    } catch {
+      toast.error('Failed to update status. Please try again.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   // Filter logic
   const filteredCandidates = candidates.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.skills.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch =
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.skills.some((s) => s.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesJob = jobFilter === 'all' || c.jobId === jobFilter;
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesJob && matchesStatus;
@@ -30,26 +52,52 @@ export default function Applications() {
     return b.overallScore - a.overallScore;
   });
 
+  const statusColor = (status: string) => {
+    switch (status) {
+      case 'Selected': return 'border-success/30 bg-success/10 text-success';
+      case 'Rejected': return 'border-error/30 bg-error/10 text-error';
+      case 'Shortlisted': return 'border-[#4FFAF0]/30 bg-[#4FFAF0]/10 text-[#4FFAF0]';
+      case 'Interview Scheduled':
+      case 'Interview': return 'border-[#FFD166]/30 bg-[#FFD166]/10 text-[#FFD166]';
+      default: return 'border-primaryGlow/30 bg-primaryGlow/10 text-primaryGlow';
+    }
+  };
+
+  const leftBarColor = (status: string) => {
+    switch (status) {
+      case 'Selected': return 'bg-success';
+      case 'Rejected': return 'bg-error';
+      case 'Shortlisted': return 'bg-[#4FFAF0]';
+      case 'Interview Scheduled':
+      case 'Interview': return 'bg-[#FFD166]';
+      default: return 'bg-primaryGlow';
+    }
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-10"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Header */}
-      <div>
-        <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">Applications Pipeline</h2>
-        <p className="text-mutedGray text-xs font-outfit mt-1">
-          Review talent candidates, evaluate screening credentials, and trigger scheduling pipelines.
-        </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">Applications Pipeline</h2>
+          <p className="text-mutedGray text-xs font-outfit mt-1">
+            Review talent candidates, run AI screening reports, and manage hiring stages.
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/4 border border-white/8 hover:bg-white/6 hover:border-primaryGlow/30 text-xs font-bold text-white uppercase tracking-wider font-space transition-all cursor-pointer disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-primaryGlow' : 'text-mutedGray'}`} />
+          Refresh
+        </button>
       </div>
 
       {/* FILTER & SORT BAR */}
       <div className="p-5 rounded-2xl glass-panel bg-[#071021]/30 border border-white/6 flex flex-col md:flex-row gap-4 items-center justify-between">
-        
-        {/* Search & Job Filters */}
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto flex-grow">
-          {/* Search bar */}
+          {/* Search */}
           <div className="relative flex-grow max-w-md">
             <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-mutedGray" />
             <input
@@ -61,19 +109,19 @@ export default function Applications() {
             />
           </div>
 
-          {/* Job select */}
+          {/* Job filter */}
           <select
             value={jobFilter}
             onChange={(e) => setJobFilter(e.target.value)}
             className="bg-[#030712] border border-white/6 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-space uppercase"
           >
             <option value="all">All Jobs</option>
-            {jobs.map(job => (
+            {jobs.map((job) => (
               <option key={job.id} value={job.id}>{job.title}</option>
             ))}
           </select>
 
-          {/* Status select */}
+          {/* Status filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -81,9 +129,9 @@ export default function Applications() {
           >
             <option value="all">All Stages</option>
             <option value="Applied">Applied</option>
-            <option value="Screening">Screening</option>
+            <option value="Under Review">Under Review</option>
             <option value="Shortlisted">Shortlisted</option>
-            <option value="Interview">Interview</option>
+            <option value="Interview Scheduled">Interview Scheduled</option>
             <option value="Selected">Selected</option>
             <option value="Rejected">Rejected</option>
           </select>
@@ -97,120 +145,140 @@ export default function Applications() {
             onChange={(e) => setSortBy(e.target.value as any)}
             className="bg-[#030712] border border-white/6 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-space uppercase"
           >
-            <option value="match">Highest Match</option>
+            <option value="match">Highest AI Match</option>
             <option value="exp">Experience</option>
-            <option value="overall">Overall Index</option>
+            <option value="overall">Overall Score</option>
           </select>
         </div>
-
       </div>
 
-      {/* CANDIDATE PROFILE LIST */}
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Applied', value: candidates.length, color: 'text-white' },
+          { label: 'Shortlisted', value: candidates.filter(c => c.status === 'Shortlisted').length, color: 'text-[#4FFAF0]' },
+          { label: 'Interviewing', value: candidates.filter(c => ['Interview', 'Interview Scheduled'].includes(c.status)).length, color: 'text-[#FFD166]' },
+          { label: 'Selected', value: candidates.filter(c => c.status === 'Selected').length, color: 'text-success' },
+        ].map((stat) => (
+          <div key={stat.label} className="p-4 rounded-xl glass-panel bg-white/2 border border-white/5 text-center">
+            <div className={`text-2xl font-black font-space ${stat.color}`}>{stat.value}</div>
+            <div className="text-[10px] text-mutedGray uppercase tracking-wider font-space mt-1">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* CANDIDATE LIST */}
       <div className="flex flex-col gap-5 text-left">
-        {sortedCandidates.length === 0 ? (
-          <div className="p-16 rounded-2xl glass-panel text-center bg-[#071021]/30 border border-white/5 flex flex-col items-center justify-center gap-4">
+        {loading ? (
+          <div className="p-16 rounded-2xl glass-panel text-center bg-[#071021]/30 border border-white/5 flex flex-col items-center gap-4">
+            <Loader2 className="w-10 h-10 text-primaryGlow animate-spin" />
+            <p className="text-xs font-bold uppercase tracking-widest text-primaryGlow font-space animate-pulse">Loading Applications...</p>
+          </div>
+        ) : sortedCandidates.length === 0 ? (
+          <div className="p-16 rounded-2xl glass-panel text-center bg-[#071021]/30 border border-white/5 flex flex-col items-center gap-4">
             <SlidersHorizontal className="w-12 h-12 text-mutedGray animate-pulse" />
-            <h4 className="text-sm font-bold uppercase tracking-wider font-space text-white">No Matching Profiles</h4>
+            <h4 className="text-sm font-bold uppercase tracking-wider font-space text-white">No Matching Applications</h4>
             <p className="text-xs text-mutedGray font-outfit max-w-xs leading-relaxed">
-              No applicant files matched the requested filters or keywords inside current pipelines.
+              {candidates.length === 0
+                ? 'No candidates have applied yet. Share your job posting to attract talent.'
+                : 'No candidates matched the current filters. Try adjusting your search.'}
             </p>
           </div>
         ) : (
-          sortedCandidates.map((cand) => (
-            <div
-              key={cand.id}
-              className="p-6 rounded-2xl glass-panel bg-white/2 border border-white/5 hover:border-white/10 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden"
-            >
-              {/* Outer Glow Indicator */}
-              <div className={`absolute left-0 inset-y-0 w-1 ${
-                cand.status === 'Selected' ? 'bg-success' : cand.status === 'Rejected' ? 'bg-error' : 'bg-primaryGlow'
-              }`} />
+          <AnimatePresence>
+            {sortedCandidates.map((cand, index) => (
+              <motion.div
+                key={cand.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.04 }}
+                className="p-6 rounded-2xl glass-panel bg-white/2 border border-white/5 hover:border-white/10 hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden"
+              >
+                {/* Status Bar */}
+                <div className={`absolute left-0 inset-y-0 w-1 ${leftBarColor(cand.status)}`} />
 
-              {/* Left Side: Avatar & Details */}
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-secondaryGlow/10 border border-secondaryGlow/25 text-secondaryGlow flex items-center justify-center font-space text-base font-black uppercase shrink-0 mt-1">
-                  {cand.name.split(' ').map(n=>n[0]).join('')}
-                </div>
-                
-                <div>
-                  <div className="flex flex-wrap items-center gap-3.5">
-                    <h4 className="text-lg font-bold text-white font-space uppercase tracking-wide">{cand.name}</h4>
-                    <span className={`text-[8px] border px-2 py-0.5 rounded font-black uppercase tracking-wider font-space ${
-                      cand.status === 'Selected' ? 'border-success/30 bg-success/10 text-success' :
-                      cand.status === 'Rejected' ? 'border-error/30 bg-error/10 text-error' :
-                      'border-primaryGlow/30 bg-primaryGlow/10 text-primaryGlow'
-                    }`}>
-                      {cand.status}
-                    </span>
+                {/* Left: Avatar & Info */}
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-secondaryGlow/10 border border-secondaryGlow/25 text-secondaryGlow flex items-center justify-center font-space text-base font-black uppercase shrink-0 mt-1">
+                    {cand.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                   </div>
-                  
-                  <span className="text-[10px] text-mutedGray font-space uppercase block mt-1">
-                    {cand.jobTitle} • {cand.experienceYears} Years Exp • {cand.education}
-                  </span>
 
-                  {/* Skills lists */}
-                  <div className="flex gap-1.5 flex-wrap mt-3.5">
-                    {cand.skills.map((skill, index) => (
-                      <span
-                        key={index}
-                        className="text-[8px] font-bold text-mutedGray bg-white/4 border border-white/6 px-2 py-0.5 rounded font-space uppercase"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Side: Score Circle & Pipelines Trigger */}
-              <div className="flex sm:flex-row flex-col items-start sm:items-center gap-6 w-full md:w-auto justify-end">
-                {/* Score Widget */}
-                <div className="flex items-center gap-3 bg-white/2 border border-white/5 rounded-xl px-4 py-2">
-                  <Brain className="w-5 h-5 text-primaryGlow" />
                   <div>
-                    <span className="text-base font-black text-white font-space block">{cand.matchScore}%</span>
-                    <span className="text-[8px] text-mutedGray uppercase font-black tracking-widest font-space">AI Index</span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h4 className="text-lg font-bold text-white font-space uppercase tracking-wide">{cand.name}</h4>
+                      <span className={`text-[8px] border px-2 py-0.5 rounded font-black uppercase tracking-wider font-space ${statusColor(cand.status)}`}>
+                        {cand.status}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-mutedGray font-space uppercase block mt-1">
+                      {cand.jobTitle} • {cand.experienceYears}y Exp • {cand.education}
+                    </span>
+                    <div className="flex gap-1.5 flex-wrap mt-3">
+                      {cand.skills.slice(0, 5).map((skill, i) => (
+                        <span key={i} className="text-[8px] font-bold text-mutedGray bg-white/4 border border-white/6 px-2 py-0.5 rounded font-space uppercase">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                {/* Dropdown status update */}
-                <select
-                  value={cand.status}
-                  onChange={(e) => updateCandidateStatus(cand.id, e.target.value as any)}
-                  className="bg-[#030712] border border-white/6 rounded-xl py-3 px-4.5 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-space uppercase"
-                >
-                  <option value="Applied">Applied</option>
-                  <option value="Screening">Screening</option>
-                  <option value="Shortlisted">Shortlisted</option>
-                  <option value="Interview">Interview</option>
-                  <option value="Selected">Selected</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                {/* Right: Score + Actions */}
+                <div className="flex sm:flex-row flex-col items-start sm:items-center gap-4 w-full md:w-auto justify-end">
+                  {/* AI Score */}
+                  <div className="flex items-center gap-3 bg-white/2 border border-white/5 rounded-xl px-4 py-2">
+                    <Brain className="w-5 h-5 text-primaryGlow" />
+                    <div>
+                      <span className="text-base font-black text-white font-space block">{cand.matchScore}%</span>
+                      <span className="text-[8px] text-mutedGray uppercase font-black tracking-widest font-space">AI Match</span>
+                    </div>
+                  </div>
 
-                {/* Direct Action buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/recruiter/screening/${cand.id}`)}
-                    className="px-4.5 py-3 rounded-xl bg-white/3 border border-white/6 hover:bg-white/5 hover:border-white/12 text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2 cursor-pointer"
-                  >
-                    <Brain className="w-4 h-4 text-primaryGlow" />
-                    <span>AI Report</span>
-                  </button>
-                  <button
-                    onClick={() => navigate('/recruiter/scheduler')}
-                    className="p-3 rounded-xl bg-white/3 border border-white/6 hover:bg-white/5 hover:border-white/12 text-white cursor-pointer"
-                    title="Schedule interview"
-                  >
-                    <Calendar className="w-4 h-4 text-secondaryGlow" />
-                  </button>
+                  {/* Status Dropdown */}
+                  <div className="relative">
+                    {updatingId === cand.id && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-[#030712]/80 rounded-xl z-10">
+                        <Loader2 className="w-4 h-4 text-primaryGlow animate-spin" />
+                      </div>
+                    )}
+                    <select
+                      value={cand.status}
+                      onChange={(e) => handleStatusChange(cand.id, e.target.value)}
+                      disabled={updatingId === cand.id}
+                      className="bg-[#030712] border border-white/6 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-primaryGlow transition-colors font-space uppercase cursor-pointer"
+                    >
+                      <option value="Applied">Applied</option>
+                      <option value="Under Review">Under Review</option>
+                      <option value="Shortlisted">Shortlisted</option>
+                      <option value="Interview Scheduled">Interview Scheduled</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/recruiter/screening/${cand.id}`)}
+                      className="px-4 py-3 rounded-xl bg-primaryGlow/10 border border-primaryGlow/20 hover:bg-primaryGlow/20 text-xs font-bold text-primaryGlow uppercase tracking-wider font-space flex items-center gap-2 cursor-pointer transition-all"
+                    >
+                      <Brain className="w-4 h-4" />
+                      <span>AI Report</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/recruiter/scheduler')}
+                      className="p-3 rounded-xl bg-white/3 border border-white/6 hover:bg-white/5 hover:border-white/12 text-white cursor-pointer transition-all"
+                      title="Schedule interview"
+                    >
+                      <Calendar className="w-4 h-4 text-secondaryGlow" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-            </div>
-          ))
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
-
     </motion.div>
   );
 }

@@ -6,10 +6,11 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const authRoutes = require('./routes/auth.cjs');
-const jobsRoutes = require('./routes/jobs.cjs');
-const appRoutes = require('./routes/applications.cjs');
+const authRoutes    = require('./routes/auth.cjs');
+const jobsRoutes    = require('./routes/jobs.cjs');
+const appRoutes     = require('./routes/applications.cjs');
 const interviewRoutes = require('./routes/interviews.cjs');
+const { router: resumeRoutes } = require('./routes/resume.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -30,10 +31,11 @@ app.use((req, res, next) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/jobs', jobsRoutes);
+app.use('/api/auth',        authRoutes);
+app.use('/api/jobs',        jobsRoutes);
 app.use('/api/applications', appRoutes);
-app.use('/api/interviews', interviewRoutes);
+app.use('/api/interviews',  interviewRoutes);
+app.use('/api/resume',      resumeRoutes);
 
 // Database-backed Analytics Route
 app.get('/api/analytics', async (req, res) => {
@@ -113,8 +115,10 @@ app.use((req, res) => {
 // Start Server
 app.listen(PORT, () => {
   console.log(`\n🚀 AI Recruit Backend running on http://localhost:${PORT}`);
-  console.log(`👉 API Auth: http://localhost:${PORT}/api/auth`);
-  console.log(`👉 API Jobs: http://localhost:${PORT}/api/jobs`);
-  console.log(`👉 API Applications: http://localhost:${PORT}/api/applications`);
-  console.log(`👉 API Interviews: http://localhost:${PORT}/api/interviews\n`);
+  console.log(`👉 Auth:         http://localhost:${PORT}/api/auth`);
+  console.log(`👉 Jobs:         http://localhost:${PORT}/api/jobs`);
+  console.log(`👉 Applications: http://localhost:${PORT}/api/applications`);
+  console.log(`👉 Interviews:   http://localhost:${PORT}/api/interviews`);
+  console.log(`👉 Resume AI:    http://localhost:${PORT}/api/resume/upload`);
+  console.log(`🤖 Gemini AI:    ${process.env.GEMINI_API_KEY ? 'CONNECTED ✅' : 'NOT CONFIGURED ❌'}\n`);
 });
