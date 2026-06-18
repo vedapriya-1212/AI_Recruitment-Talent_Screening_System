@@ -72,9 +72,10 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
   const { email, password, first_name, last_name, role } = req.body;
-  if (!email || !password || !first_name || !last_name || !role) {
-    return res.status(400).json({ error: 'All fields are required' });
+  if (!email || !password || !first_name || !role) {
+    return res.status(400).json({ error: 'Email, password, first name, and role are required' });
   }
+  const safeLastName = last_name || '';
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
     if (authError) return res.status(400).json({ error: authError.message });
@@ -82,7 +83,7 @@ router.post('/signup', async (req, res) => {
     const userId = authData.user.id;
 
     const { error: dbError } = await supabase.from('users').insert({
-      id: userId, email, first_name, last_name, role,
+      id: userId, email, first_name, last_name: safeLastName, role,
       password_hash: 'managed_by_supabase_auth',
     });
     if (dbError) return res.status(500).json({ error: dbError.message });
