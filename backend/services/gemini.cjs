@@ -112,4 +112,35 @@ Return format: ["skill1", "skill2", ...]`;
   }
 }
 
-module.exports = { analyzeResumeWithGemini, extractSkillsFromResume };
+/**
+ * Generate constructive feedback for the candidate based on their resume
+ */
+async function generateCandidateFeedback(resumeText, targetRole = 'Software Engineer') {
+  const m = getModel();
+  const prompt = `You are a career coach AI. Analyze the following resume text for a candidate aiming for the role of "${targetRole}". 
+Return ONLY a valid JSON object with constructive feedback. Do NOT include any hiring recommendation or score that a recruiter would see.
+
+## CANDIDATE RESUME TEXT
+${resumeText.slice(0, 4000)}
+
+## INSTRUCTIONS
+Return ONLY JSON with this exact structure:
+{
+  "extractedSkills": ["skill1", "skill2", ...],
+  "skillGapAnalysis": "A 2-3 sentence analysis of what skills are missing for a typical ${targetRole} role.",
+  "suggestedCourses": ["course 1", "course 2"],
+  "resumeImprovementTips": ["tip 1", "tip 2"]
+}`;
+
+  try {
+    const result = await m.generateContent(prompt);
+    const text = result.response.text().trim()
+      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    return JSON.parse(text);
+  } catch (err) {
+    console.error('Gemini Feedback error:', err.message);
+    throw new Error('AI feedback failed: ' + err.message);
+  }
+}
+
+module.exports = { analyzeResumeWithGemini, extractSkillsFromResume, generateCandidateFeedback };

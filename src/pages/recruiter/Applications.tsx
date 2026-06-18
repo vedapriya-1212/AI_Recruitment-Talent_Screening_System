@@ -4,6 +4,7 @@ import { useApplication } from '../../contexts/ApplicationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, ArrowUpDown, Brain, Calendar, RefreshCw, Loader2, CheckCircle2, XCircle, Clock, Star } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 export default function Applications() {
   const { candidates, jobs, updateCandidateStatus, refreshAll, loading } = useApplication();
@@ -15,6 +16,8 @@ export default function Applications() {
   const [sortBy, setSortBy] = useState<'match' | 'exp' | 'overall'>('match');
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  
+  const { addNotification } = useNotifications();
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -28,6 +31,22 @@ export default function Applications() {
     try {
       await updateCandidateStatus(candId, newStatus as any);
       toast.success(`Status updated to "${newStatus}"`);
+      
+      const candidate = candidates.find(c => c.id === candId);
+      const job = jobs.find(j => j.id === candidate?.jobId);
+      
+      // Dispatch notification to Candidate via shared localStorage
+      let nType: 'info' | 'success' | 'warning' | 'error' = 'info';
+      if (newStatus === 'Selected' || newStatus === 'Shortlisted') nType = 'success';
+      if (newStatus === 'Rejected') nType = 'error';
+      if (newStatus === 'Interview Scheduled') nType = 'warning'; // warning color is usually yellow/gold
+      
+      addNotification(
+        `Application ${newStatus}`,
+        `Your application for ${job?.title || 'a role'} has been updated to ${newStatus}.`,
+        nType
+      );
+      
     } catch {
       toast.error('Failed to update status. Please try again.');
     } finally {

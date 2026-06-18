@@ -16,6 +16,11 @@ export default function ResumeUpload() {
   const [hasError, setHasError] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [extractedData, setExtractedData] = useState<any>(null);
+  
+  // New Feedback states
+  const [feedback, setFeedback] = useState<any>(null);
+  const [generatingFeedback, setGeneratingFeedback] = useState(false);
+  
   const consoleBottomRef = useRef<HTMLDivElement>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('ats_token') : null;
@@ -107,11 +112,13 @@ export default function ResumeUpload() {
       addLog(`🚀 STATUS: Resume stored & ready for AI screening`);
 
       setExtractedData(extracted);
+      setFeedback(null); // reset feedback on new upload
       setIsDone(true);
       setUploading(false);
+      localStorage.setItem('has_uploaded_resume', 'true');
 
       toast.success('Resume Analyzed Successfully!', {
-        description: `${selectedFile.name} processed. AI screening will use this resume when recruiters view your report.`,
+        description: `${selectedFile.name} processed. AI screening will use this resume when recruiters view your application.`,
       });
     } catch (err: any) {
       addLog(`❌ ERROR: ${err.message}`);
@@ -346,13 +353,77 @@ export default function ResumeUpload() {
                   {/* AI Ready Banner */}
                   <div className="p-4 rounded-xl bg-primaryGlow/5 border border-primaryGlow/20 flex items-center gap-3">
                     <Brain className="w-5 h-5 text-primaryGlow shrink-0" />
-                    <div>
+                    <div className="flex-1">
                       <div className="text-xs font-bold text-primaryGlow font-space uppercase tracking-wide">AI Screening Ready</div>
                       <div className="text-[10px] text-mutedGray font-outfit mt-0.5">
                         Recruiters who view your application report will now get a real Gemini AI analysis of this resume vs the job requirements.
                       </div>
                     </div>
                   </div>
+
+                  {/* Constructive Feedback Section */}
+                  {feedback ? (
+                    <div className="p-5 rounded-xl border border-white/10 bg-black/40 space-y-4">
+                      <h4 className="text-xs font-black text-white font-space uppercase flex items-center gap-2">
+                        <Terminal className="w-4 h-4 text-primaryGlow" /> Career Feedback
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <span className="text-[10px] text-mutedGray uppercase font-space font-bold">Skill Gap Analysis</span>
+                          <p className="text-xs text-white mt-1 leading-relaxed">{feedback.skillGapAnalysis}</p>
+                        </div>
+                        {feedback.suggestedCourses?.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-mutedGray uppercase font-space font-bold">Suggested Courses</span>
+                            <ul className="mt-1 space-y-1">
+                              {feedback.suggestedCourses.map((c: string, i: number) => (
+                                <li key={i} className="text-xs text-white flex items-center gap-2">
+                                  <span className="w-1 h-1 rounded-full bg-primaryGlow" /> {c}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {feedback.resumeImprovementTips?.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-mutedGray uppercase font-space font-bold">Improvement Tips</span>
+                            <ul className="mt-1 space-y-1">
+                              {feedback.resumeImprovementTips.map((t: string, i: number) => (
+                                <li key={i} className="text-xs text-white flex items-center gap-2">
+                                  <span className="w-1 h-1 rounded-full bg-primaryGlow" /> {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={async () => {
+                        setGeneratingFeedback(true);
+                        try {
+                          const res = await fetch(`${API_BASE}/api/resume/feedback`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ targetRole: user?.preferredRole || 'Software Engineer' })
+                          });
+                          const data = await res.json();
+                          if(data.success) setFeedback(data.feedback);
+                          else throw new Error(data.error);
+                        } catch(e: any) {
+                          toast.error('Failed to generate feedback: ' + e.message);
+                        } finally {
+                          setGeneratingFeedback(false);
+                        }
+                      }}
+                      disabled={generatingFeedback}
+                      className="w-full py-3 rounded-xl border border-primaryGlow/30 bg-primaryGlow/5 text-primaryGlow text-xs font-bold font-space uppercase tracking-wider hover:bg-primaryGlow/10 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {generatingFeedback ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      Generate Constructive Career Feedback
+                    </button>
+                  )}
                 </div>
 
                 {/* Re-upload button */}

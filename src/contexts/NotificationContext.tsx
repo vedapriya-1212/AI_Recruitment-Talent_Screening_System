@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 export interface AppNotification {
@@ -22,55 +22,75 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+const STORAGE_KEY = 'app_notifications_sync';
+
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<AppNotification[]>([
-    {
-      id: 'init-1',
-      title: 'Interview Scheduled',
-      message: 'Your interview for Senior React Architect has been scheduled with Tech Lead.',
-      timestamp: 'Just now',
-      read: false,
-      type: 'info',
-    },
-    {
-      id: 'init-2',
-      title: 'Application Shortlisted',
-      message: 'Your application for the Security Operations Lead role has been shortlisted.',
-      timestamp: '10m ago',
-      read: false,
-      type: 'success',
-    },
-    {
-      id: 'init-3',
-      title: 'Profile Viewed',
-      message: 'A recruiter from ZeroTrust Lab viewed your indexed profile skills.',
-      timestamp: '2h ago',
-      read: true,
-      type: 'info',
-    },
-    {
-      id: 'init-4',
-      title: 'Application Rejected',
-      message: 'Unfortunately, your application for the Junior Python Engineer role was rejected.',
-      timestamp: '1d ago',
-      read: true,
-      type: 'error',
-    },
-  ]);
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.warn('Failed to parse notifications', e);
+    }
+    return [
+      {
+        id: 'init-1',
+        title: 'Welcome to AI ATS',
+        message: 'Your profile has been indexed by the neural match engine.',
+        timestamp: 'Just now',
+        read: false,
+        type: 'info',
+      }
+    ];
+  });
+
+  // Sync to localStorage whenever notifications change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+  }, [notifications]);
+
+  // Listen to cross-tab changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          // Check if there are new unread notifications to trigger a toast
+          const oldUnread = notifications.filter(n => !n.read).map(n => n.id);
+          const newUnreads = parsed.filter((n: AppNotification) => !n.read && !oldUnread.includes(n.id));
+          
+          setNotifications(parsed);
+          
+          // Fire toasts for new cross-tab notifications
+          newUnreads.forEach((n: AppNotification) => {
+            if (n.type === 'success') toast.success(n.title, { description: n.message });
+            else if (n.type === 'error') toast.error(n.title, { description: n.message });
+            else if (n.type === 'warning') toast.warning(n.title, { description: n.message });
+            else toast(n.title, { description: n.message });
+          });
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [notifications]);
 
   const addNotification = (title: string, message: string, type: AppNotification['type'] = 'info') => {
     const newNotif: AppNotification = {
       id: Math.random().toString(36).substring(2, 9),
       title,
       message,
-      timestamp: 'Just now',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: false,
       type,
     };
 
-    setNotifications((prev) => [newNotif, ...prev]);
+    setNotifications((prev) => {
+      const next = [newNotif, ...prev];
+      return next;
+    });
 
-    // Sonner popup alerts
+    // Local tab toast
     if (type === 'success') {
       toast.success(title, { description: message });
     } else if (type === 'error') {

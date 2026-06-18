@@ -130,5 +130,27 @@ router.get('/candidate/:id', requireAuth, async (req, res) => {
   return res.json({ text: null, filename: null });
 });
 
+// ── POST /api/resume/feedback ─────────────────────────────────────────────
+// Candidate fetches their own constructive AI feedback
+router.post('/feedback', requireAuth, async (req, res) => {
+  if (req.user.role !== 'candidate') return res.status(403).json({ error: 'Candidates only' });
+  
+  const candidateId = req.user.id;
+  const cached = resumeCache.get(candidateId);
+  if (!cached || !cached.text) {
+    return res.status(404).json({ error: 'No resume found. Please upload a resume first.' });
+  }
+
+  const { targetRole } = req.body;
+  const { generateCandidateFeedback } = require('../services/gemini.cjs');
+
+  try {
+    const feedback = await generateCandidateFeedback(cached.text, targetRole || 'Software Engineer');
+    return res.json({ success: true, feedback });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Export cache so applications.cjs can access it
 module.exports = { router, resumeCache };
