@@ -32,6 +32,59 @@ function mapJob(j) {
   };
 }
 
+// GET /api/jobs/recommendations  – personalised job matches for a candidate
+router.get('/recommendations', async (req, res) => {
+  try {
+    // Get candidate's resume from cache to extract their skills
+    let candidateSkills = [];
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    if (token) {
+      try {
+        const { supabase: sb } = require('../db.cjs');
+        const { data: { user } } = await sb.auth.getUser(token);
+        if (user) {
+          const { resumeCache } = require('./resume.cjs');
+          const resumeData = resumeCache.get(user.id);
+          if (resumeData?.text) {
+            // Extract skills from resume text via simple keyword matching
+            const knownSkills = ['javascript','typescript','react','node','python','java','go','rust','aws','docker',
+              'kubernetes','sql','postgresql','mongodb','graphql','vue','angular','next','fastapi','django','spring',
+              'machine learning','deep learning','tensorflow','pytorch','data science','devops','ci/cd','git'];
+            const resumeLower = resumeData.text.toLowerCase();
+            candidateSkills = knownSkills.filter(s => resumeLower.includes(s));
+          }
+        }
+      } catch { /* ignore auth errors */ }
+    }
+
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    const jobs = (data || []).map(mapJob);
+
+    // Score each job by skill overlap with candidate
+    const scored = jobs.map(job => {
+      const jobSkills = job.skills.map(s => s.toLowerCase());
+      const matchCount = candidateSkills.filter(cs => jobSkills.some(js => js.includes(cs) || cs.includes(js))).length;
+      const total = Math.max(jobSkills.length, 1);
+      const relevanceScore = candidateSkills.length > 0
+        ? Math.round((matchCount / total) * 100)
+        : Math.floor(50 + Math.random() * 40); // Random 50-90% if no resume
+      return { ...job, relevanceScore };
+    });
+
+    // Sort by relevance descending, return top 5
+    scored.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    return res.json(scored.slice(0, 5));
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/jobs  – public, returns all active jobs
 router.get('/', async (req, res) => {
   try {

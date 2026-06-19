@@ -6,7 +6,8 @@ interface AuthContextType {
   role: 'candidate' | 'recruiter' | null;
   loading: boolean;
   login: (email: string, password_hash: string, selectedRole?: 'candidate' | 'recruiter') => Promise<UserProfile>;
-  signup: (email: string, password_hash: string, first_name: string, last_name: string, role: 'candidate' | 'recruiter') => Promise<UserProfile>;
+  signup: (email: string, password_hash: string, first_name: string, last_name: string, role: 'candidate' | 'recruiter', otp?: string) => Promise<any>;
+  resendOtp: (email: string) => Promise<any>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -61,20 +62,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password_hash: string,
     first_name: string,
     last_name: string,
-    role: 'candidate' | 'recruiter'
+    role: 'candidate' | 'recruiter',
+    otp?: string
   ) => {
     setLoading(true);
     try {
-      const profile = await AuthService.signup(email, password_hash, first_name, last_name, role);
-      setUser(profile);
-      setRole(profile.role);
-      return profile;
+      const result = await AuthService.signup(email, password_hash, first_name, last_name, role, otp);
+      if (result && !result.otpRequired) {
+        setUser(result);
+        setRole(result.role);
+      }
+      return result;
     } catch (err) {
       setLoading(false);
       throw err;
     } finally {
       setLoading(false);
     }
+  };
+
+  const resendOtp = async (email: string) => {
+    return await AuthService.resendOtp(email);
   };
 
   const logout = async () => {
@@ -89,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, signup, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, role, loading, login, signup, resendOtp, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

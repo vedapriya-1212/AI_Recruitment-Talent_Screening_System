@@ -5,6 +5,9 @@ const express = require('express');
 const router  = express.Router();
 const { supabase } = require('../db.cjs');
 
+// In-memory pending registrations cache: email -> { otp_code, expires_at, first_name, last_name, role, password }
+const pendingRegistrations = new Map();
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   const { email, password, role } = req.body;
@@ -71,18 +74,75 @@ router.post('/login', async (req, res) => {
 
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
-  const { email, password, first_name, last_name, role } = req.body;
+  const { email, password, first_name, last_name, role, otp } = req.body;
   if (!email || !password || !first_name || !role) {
     return res.status(400).json({ error: 'Email, password, first name, and role are required' });
   }
   const safeLastName = last_name || '';
+
   try {
+    // 1. Check if user already exists in public.users
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+      
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email is already registered' });
+    }
+
+    // 2. If OTP is NOT provided, generate it and send it
+    if (!otp) {
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+
+      // Save to pendingRegistrations map
+      pendingRegistrations.set(email.toLowerCase(), {
+        otp_code: otpCode,
+        expires_at: expiresAt,
+        first_name,
+        last_name: safeLastName,
+        role,
+        password
+      });
+
+      // Send OTP via SMTP
+      const { sendEmail } = require('../services/email.cjs');
+      await sendEmail({
+        to: email,
+        subject: 'Your AI Recruit Verification Code',
+        text: `Hello ${first_name},\n\nYour 6-digit verification code is: ${otpCode}\n\nThis code will expire in 5 minutes.`,
+        html: `<p>Hello ${first_name},</p><p>Your 6-digit verification code is: <strong>${otpCode}</strong></p><p>This code will expire in 5 minutes.</p>`
+      });
+
+      return res.json({ otpRequired: true, message: 'OTP sent to email' });
+    }
+
+    // 3. OTP is provided - verify it
+    const pending = pendingRegistrations.get(email.toLowerCase());
+
+    if (!pending) {
+      return res.status(400).json({ error: 'No pending registration found for this email. Please request a new OTP.' });
+    }
+
+    // Check expiration
+    if (new Date() > new Date(pending.expires_at)) {
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new OTP.' });
+    }
+
+    // Verify code
+    if (pending.otp_code !== otp) {
+      return res.status(400).json({ error: 'Invalid verification code. Please try again.' });
+    }
+
+    // OTP matches! Complete registration
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
     if (authError) return res.status(400).json({ error: authError.message });
 
     const userId = authData.user.id;
 
-    // Upsert profile (handles re-signups gracefully)
+    // Upsert profile
     const { error: dbError } = await supabase.from('users').upsert({
       id: userId, email, first_name, last_name: safeLastName, role,
       password_hash: 'managed_by_supabase_auth',
@@ -98,14 +158,16 @@ router.post('/signup', async (req, res) => {
       } catch (e) { console.warn('candidate_profiles seed:', e.message); }
     }
 
-    // Session may be null if Supabase requires email confirmation
-    // In that case we try to auto-login to get a session token
+    // Delete pending registration
+    pendingRegistrations.delete(email.toLowerCase());
+
+    // Auto-login to return session token
     let token = authData.session?.access_token;
     if (!token) {
       try {
         const { data: loginData } = await supabase.auth.signInWithPassword({ email, password });
         token = loginData?.session?.access_token;
-      } catch (e) { /* email confirmation required – token will be null */ }
+      } catch (e) { /* fallback if auto-login not possible */ }
     }
 
     return res.json({
@@ -113,6 +175,42 @@ router.post('/signup', async (req, res) => {
       emailConfirmationRequired: !token,
       user: { id: userId, email, first_name, last_name: safeLastName, role },
     });
+
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/resend-otp
+router.post('/resend-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const pending = pendingRegistrations.get(email.toLowerCase());
+
+    if (!pending) {
+      return res.status(400).json({ error: 'No pending registration found for this email.' });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+
+    // Update pending record
+    pending.otp_code = otpCode;
+    pending.expires_at = expiresAt;
+    pendingRegistrations.set(email.toLowerCase(), pending);
+
+    // Send OTP via SMTP
+    const { sendEmail } = require('../services/email.cjs');
+    await sendEmail({
+      to: email,
+      subject: 'Your AI Recruit Verification Code (Resent)',
+      text: `Hello ${pending.first_name},\n\nYour new 6-digit verification code is: ${otpCode}\n\nThis code will expire in 5 minutes.`,
+      html: `<p>Hello ${pending.first_name},</p><p>Your new 6-digit verification code is: <strong>${otpCode}</strong></p><p>This code will expire in 5 minutes.</p>`
+    });
+
+    return res.json({ success: true, message: 'OTP code has been resent to your email.' });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

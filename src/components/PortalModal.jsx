@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 export default function PortalModal({ isOpen, onClose }) {
   const navigate = useNavigate();
-  const { login, signup } = useAuth();
+  const { login, signup, resendOtp } = useAuth();
 
   const [activePortal, setActivePortal] = useState(null); // 'recruiter' | 'candidate' | null
   const [isSignUp, setIsSignUp] = useState(false);
@@ -17,6 +17,11 @@ export default function PortalModal({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // OTP Verification States
+  const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
 
   // Detailed Form States
   // Recruiter fields
@@ -47,11 +52,37 @@ export default function PortalModal({ isOpen, onClose }) {
     setSkills('');
     setGithubUrl('');
     setIsLoading(false);
+    setShowOtpScreen(false);
+    setOtpCode('');
+    setResendCountdown(0);
   };
 
   const handleClose = () => {
     resetState();
     onClose();
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCountdown > 0) return;
+    setIsLoading(true);
+    try {
+      await resendOtp(email);
+      toast.success('Verification code resent to your email.');
+      setResendCountdown(60);
+      const timer = setInterval(() => {
+        setResendCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resend verification code.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -72,7 +103,30 @@ export default function PortalModal({ isOpen, onClose }) {
         const firstName = names[0] || '';
         const lastName = names.slice(1).join(' ') || '';
 
-        profile = await signup(email, password, firstName, lastName, activePortal);
+        if (!showOtpScreen) {
+          // Phase 1: Send OTP
+          const res = await signup(email, password, firstName, lastName, activePortal);
+          if (res && res.otpRequired) {
+            setShowOtpScreen(true);
+            setResendCountdown(60);
+            const timer = setInterval(() => {
+              setResendCountdown(prev => {
+                if (prev <= 1) {
+                  clearInterval(timer);
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+            toast.success('Verification code sent to your email.');
+            setIsLoading(false);
+            return;
+          }
+          profile = res;
+        } else {
+          // Phase 2: Verify OTP
+          profile = await signup(email, password, firstName, lastName, activePortal, otpCode);
+        }
 
         // Save detailed profile data locally for mock representation
         const detailedProfile = activePortal === 'recruiter'
@@ -229,9 +283,8 @@ export default function PortalModal({ isOpen, onClose }) {
                         ? 'Connect your enterprise to the neural pipeline'
                         : 'Submit details to let the AI match your profile'}
                     </p>
-
                     {/* Premium Sliding Segmented Switcher */}
-                    {(!isSignUp || signUpStep === 1) && (
+                    {(!isSignUp || signUpStep === 1) && !showOtpScreen && (
                       <div className="flex p-1 bg-white/5 border border-white/10 rounded-xl max-w-[280px] mx-auto relative shadow-inner">
                         <button
                           type="button"
@@ -278,7 +331,69 @@ export default function PortalModal({ isOpen, onClose }) {
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                    {isSignUp && signUpStep === 2 ? (
+                    {showOtpScreen ? (
+                      <div className="space-y-4 text-center">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-mutedGray font-space">Step 3: Verification</span>
+                          <button
+                            type="button"
+                            onClick={() => { setShowOtpScreen(false); setOtpCode(''); }}
+                            className="text-[9px] text-primaryGlow hover:text-white uppercase tracking-wider font-space cursor-pointer bg-transparent border-none outline-none"
+                          >
+                            ← Back
+                          </button>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-3 font-space text-center">Enter the 6-digit OTP code sent to your email</label>
+                          <div className="relative max-w-[200px] mx-auto">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              required
+                              disabled={isLoading}
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="000000"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 text-center text-xl tracking-[10px] font-bold text-white focus:outline-none focus:border-primaryGlow focus:ring-1 focus:ring-primaryGlow transition-all duration-200 font-space disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isLoading || otpCode.length !== 6}
+                          className={`w-full py-3.5 mt-4 rounded-xl font-bold text-xs flex items-center justify-center transition-all duration-300 relative overflow-hidden group shadow-lg cursor-pointer font-space uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed ${
+                            activePortal === 'recruiter'
+                              ? 'bg-primaryGlow text-[#030712] shadow-primaryGlow/10 hover:shadow-primaryGlow/25'
+                              : 'bg-secondaryGlow text-white shadow-secondaryGlow/10 hover:shadow-secondaryGlow/25'
+                          }`}
+                        >
+                          {isLoading ? (
+                            <>
+                              <span>Verifying Code...</span>
+                              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                            </>
+                          ) : (
+                            <>
+                              <span>Verify & Register</span>
+                              <ShieldCheck className="w-4 h-4 ml-2" />
+                            </>
+                          )}
+                        </button>
+
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            disabled={isLoading || resendCountdown > 0}
+                            onClick={handleResendOtp}
+                            className="text-xs text-mutedGray hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all font-outfit"
+                          >
+                            {resendCountdown > 0 ? `Resend Code in ${resendCountdown}s` : 'Resend Verification Code'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : isSignUp && signUpStep === 2 ? (
                       // STEP 2: DETAILED DATA FOR FIRST-TIME SIGNUP
                       <div className="space-y-4">
                         <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-2">
@@ -540,7 +655,7 @@ export default function PortalModal({ isOpen, onClose }) {
                     )}
                   </form>
 
-                  {(!isSignUp || signUpStep === 1) && (
+                  {(!isSignUp || signUpStep === 1) && !showOtpScreen && (
                     <div className="text-center mt-6">
                       <button
                         onClick={() => setIsSignUp(!isSignUp)}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApplication } from '../../contexts/ApplicationContext';
 import { motion } from 'framer-motion';
@@ -9,10 +10,27 @@ const phases = ['Applied', 'Screening', 'Shortlisted', 'Interview', 'Selected'];
 export default function Tracker() {
   const { user } = useAuth();
   const { candidates } = useApplication();
+  const navigate = useNavigate();
 
   const myProfile = candidates.find((c) => c.email.toLowerCase() === user?.email.toLowerCase()) || candidates[0];
 
-  if (!myProfile) return null;
+  if (!myProfile) {
+    return (
+      <div className="p-8 rounded-2xl glass-panel border border-[#FFD166]/30 bg-[#FFD166]/5 flex flex-col items-center justify-center text-center py-20 gap-4">
+        <HelpCircle className="w-12 h-12 text-[#FFD166] animate-pulse" />
+        <h3 className="text-lg font-black uppercase tracking-wider font-space text-white">No Active Tracking</h3>
+        <p className="text-xs text-mutedGray max-w-md font-outfit leading-relaxed">
+          You can track your application stage once you apply for an active job position. Go to "Available Jobs" to submit your resume.
+        </p>
+        <button
+          onClick={() => navigate('/candidate/jobs')}
+          className="mt-2 px-5 py-2.5 rounded-xl bg-[#FFD166] text-[#030712] text-xs font-bold uppercase tracking-wider font-space hover:scale-105 transition-all cursor-pointer"
+        >
+          View Available Jobs
+        </button>
+      </div>
+    );
+  }
 
   // Determine current active phase index
   const currentIdx = phases.indexOf(myProfile.status);

@@ -6,8 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Cpu, LayoutDashboard, PlusCircle, Users, Trophy, 
   Calendar, BarChart3, UserCheck, Activity, LogOut, Bell, X, Menu,
-  Briefcase, ClipboardList, Percent 
+  Briefcase, ClipboardList, Percent, Mail
 } from 'lucide-react';
+import CandidateChatbot from '../components/CandidateChatbot';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 interface SidebarItem {
   label: string;
@@ -24,6 +26,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [detailedProfile, setDetailedProfile] = useState<any>(null);
+  const mainRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const stored = localStorage.getItem('user_detailed_profile');
@@ -36,18 +39,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user]);
 
+  // Reset scroll to top on every route navigation
+  React.useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/');
   };
 
   const recruiterItems: SidebarItem[] = [
-    { label: 'Overview', path: '/recruiter/dashboard', icon: LayoutDashboard },
-    { label: 'Create Job', path: '/recruiter/create-job', icon: PlusCircle },
-    { label: 'Applications', path: '/recruiter/applications', icon: Users },
-    { label: 'Rankings', path: '/recruiter/rankings', icon: Trophy },
-    { label: 'Scheduler', path: '/recruiter/scheduler', icon: Calendar },
-    { label: 'Analytics', path: '/recruiter/analytics', icon: BarChart3 },
+    { label: 'Overview',    path: '/recruiter/dashboard',  icon: LayoutDashboard },
+    { label: 'Create Job',  path: '/recruiter/create-job', icon: PlusCircle },
+    { label: 'Applications',path: '/recruiter/applications',icon: Users },
+    { label: 'Rankings',    path: '/recruiter/rankings',   icon: Trophy },
+    { label: 'Scheduler',   path: '/recruiter/scheduler',  icon: Calendar },
+    { label: 'Analytics',   path: '/recruiter/analytics',  icon: BarChart3 },
+    { label: 'Email Logs',  path: '/recruiter/email-logs', icon: Mail },
   ];
 
   const candidateItems: SidebarItem[] = [
@@ -64,10 +75,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const items = role === 'recruiter' ? recruiterItems : candidateItems;
 
   return (
-    <div className="h-screen bg-[#030712] text-white flex flex-col md:flex-row relative overflow-hidden">
+    <div className="h-screen bg-[#030712] text-white flex flex-col lg:flex-row relative overflow-hidden">
       
       {/* Top Mobile Nav Bar */}
-      <header className="md:hidden w-full px-6 py-4 flex items-center justify-between glass-panel border-b border-white/6 z-30 bg-[#071021]/80 backdrop-blur-md">
+      <header className="lg:hidden w-full px-6 py-4 flex items-center justify-between glass-panel border-b border-white/6 z-30 bg-[#071021]/90 backdrop-blur-md sticky top-0">
         <div className="flex items-center gap-2">
           <Cpu className="w-5 h-5 text-primaryGlow" />
           <span className="text-sm font-black font-space uppercase tracking-wider text-white">AI Recruit</span>
@@ -89,12 +100,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar Navigation */}
       <aside className={`
         fixed inset-y-0 left-0 w-64 z-40 bg-[#071021]/90 backdrop-blur-md border-r border-white/6 p-6 flex flex-col justify-between
-        transform md:translate-x-0 md:static md:h-screen transition-transform duration-300 ease-in-out
+        transform lg:translate-x-0 lg:static lg:h-screen transition-transform duration-300 ease-in-out
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col gap-8">
           {/* Header Logo */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primaryGlow to-secondaryGlow p-[1px] flex items-center justify-center">
               <Cpu className="w-4 h-4 text-primaryGlow animate-pulse" />
             </div>
@@ -201,11 +212,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </AnimatePresence>
 
       {/* Dashboard Main Content Area */}
-      <main className="flex-1 h-full overflow-y-auto p-6 md:p-10 z-10 relative">
+      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto p-6 lg:p-10 z-10 relative">
         <div className="max-w-6xl mx-auto w-full pb-10">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
+
+      {/* AI Chatbot — only for candidates */}
+      {role === 'candidate' && <CandidateChatbot />}
     </div>
   );
 }

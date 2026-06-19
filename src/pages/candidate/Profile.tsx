@@ -36,8 +36,8 @@ export default function CandidateProfile() {
   const [profilePic, setProfilePic] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120&h=120');
   
   // Skills list state
-  const [skillsText, setSkillsText] = useState(myProfile.skills.join(', '));
-  const [skillsList, setSkillsList] = useState<string[]>(myProfile.skills);
+  const [skillsText, setSkillsText] = useState(myProfile?.skills?.join(', ') || 'React, TypeScript, CSS, Node.js');
+  const [skillsList, setSkillsList] = useState<string[]>(myProfile?.skills || ['React', 'TypeScript', 'CSS', 'Node.js']);
 
   // Change Password Modal States
   const [passModalOpen, setPassModalOpen] = useState(false);
@@ -340,7 +340,7 @@ export default function CandidateProfile() {
               
               <div className="p-3 bg-white/2 border border-white/5 rounded-xl text-left">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-mutedGray font-space block">Leaderboard Rank</span>
-                <span className="text-lg font-black text-[#FFD166] font-space mt-1 block">#0{myProfile.rank} Position</span>
+                <span className="text-lg font-black text-[#FFD166] font-space mt-1 block">#0{myProfile?.rank || 1} Position</span>
               </div>
             </div>
           </div>

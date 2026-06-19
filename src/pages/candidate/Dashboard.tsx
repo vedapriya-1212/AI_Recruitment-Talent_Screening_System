@@ -1,13 +1,19 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApplication } from '../../contexts/ApplicationContext';
 import { motion } from 'framer-motion';
-import { Cpu, Trophy, Activity, ClipboardList, ArrowRight, Calendar, Sparkles, Briefcase, Loader2, Bell } from 'lucide-react';
 import {
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
+  Cpu, Trophy, Activity, ClipboardList, ArrowRight, Calendar,
+  Sparkles, Briefcase, Loader2, Bell, FileText, CheckCircle2,
+  UploadCloud, Zap, Star
+} from 'lucide-react';
+import {
+  ResponsiveContainer, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, AreaChart, Area, Legend
 } from 'recharts';
+import { apiClient } from '../../api/apiClient';
+import { JobPost } from '../../api/mockData';
 
 const STATUS_COLORS: Record<string, string> = {
   Applied: '#7C6BFF',
@@ -20,10 +26,19 @@ const STATUS_COLORS: Record<string, string> = {
   'Interview Scheduled': '#FFD166',
 };
 
+interface ResumeStatus { hasResume: boolean; filename?: string; uploadedAt?: string; }
+type RecommendedJob = JobPost & { relevanceScore: number };
+
 export default function CandidateDashboard() {
   const { user } = useAuth();
   const { myApplications, myInterviews, jobs, loading } = useApplication();
   const navigate = useNavigate();
+
+  const [resumeStatus, setResumeStatus] = useState<ResumeStatus>({ hasResume: false });
+
+  useEffect(() => {
+    apiClient.getResumeStatus().then(setResumeStatus).catch(() => {});
+  }, []);
 
   // ── Real computed stats ──────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -37,69 +52,46 @@ export default function CandidateDashboard() {
     return { total, shortlisted, upcoming };
   }, [myApplications, myInterviews]);
 
-  // ── Real chart data ──────────────────────────────────────────────────────
   const statusDistribution = useMemo(() => {
-    if (myApplications.length === 0) {
-      return [{ name: 'No Applications Yet', value: 1, fill: '#334155' }];
-    }
+    if (myApplications.length === 0) return [{ name: 'No Applications Yet', value: 1, fill: '#334155' }];
     const counts: Record<string, number> = {};
-    myApplications.forEach(a => {
-      const key = a.status || 'Applied';
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    return Object.entries(counts).map(([name, value]) => ({
-      name,
-      value,
-      fill: STATUS_COLORS[name] || '#94A3B8',
-    }));
+    myApplications.forEach(a => { const key = a.status || 'Applied'; counts[key] = (counts[key] || 0) + 1; });
+    return Object.entries(counts).map(([name, value]) => ({ name, value, fill: STATUS_COLORS[name] || '#94A3B8' }));
   }, [myApplications]);
 
-  // Applications over time (by month)
   const applicationsOverTime = useMemo(() => {
     const monthCounts: Record<string, number> = {};
     myApplications.forEach(a => {
       const month = new Date(a.appliedDate).toLocaleString('default', { month: 'short' });
       monthCounts[month] = (monthCounts[month] || 0) + 1;
     });
-    if (Object.keys(monthCounts).length === 0) {
-      return [{ month: 'Now', count: 0 }];
-    }
+    if (Object.keys(monthCounts).length === 0) return [{ month: 'Now', count: 0 }];
     return Object.entries(monthCounts).map(([month, count]) => ({ month, count }));
   }, [myApplications]);
 
-  // Interview activity (by stage)
   const interviewActivity = useMemo(() => {
     const stageCounts: Record<string, number> = { 'HR Screening': 0, 'Technical Review': 0, 'Final Panel': 0 };
     myInterviews.forEach(i => { stageCounts[i.stage] = (stageCounts[i.stage] || 0) + 1; });
     return Object.entries(stageCounts).map(([stage, sessions]) => ({ week: stage.split(' ')[0], sessions }));
   }, [myInterviews]);
 
-  // Recent jobs matching (top 4 newest jobs from DB)
-  const recentJobs = useMemo(() => jobs.slice(0, 4), [jobs]);
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
         <Loader2 className="w-10 h-10 text-primaryGlow animate-spin" />
-        <p className="text-xs font-bold uppercase tracking-widest text-primaryGlow font-space animate-pulse">
-          Loading Your Workspace...
-        </p>
+        <p className="text-xs font-bold uppercase tracking-widest text-primaryGlow font-space animate-pulse">Loading Your Workspace...</p>
       </div>
     );
   }
 
+  const scoreColor = (score: number) => score >= 80 ? 'text-emerald-400' : score >= 60 ? 'text-primaryGlow' : 'text-[#FFD166]';
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-10 text-left"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-10 text-left">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">
-            Candidate Core OS
-          </h2>
+          <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">Candidate Core OS</h2>
           <p className="text-mutedGray text-xs font-outfit mt-1">
             Welcome back, <span className="text-primaryGlow font-bold">{user?.first_name} {user?.last_name}</span>. Monitor your live application pipeline, scores, and interview slots.
           </p>
@@ -110,65 +102,66 @@ export default function CandidateDashboard() {
         </div>
       </div>
 
-      {/* TOP METRIC CARDS — all real */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 hover:border-primaryGlow/25 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space">Total Applications</p>
-              <h3 className="text-3xl font-black text-white mt-3 font-space">{stats.total}</h3>
-              <span className="text-[9px] text-mutedGray mt-1 block font-space uppercase">Active Pipelines</span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-primaryGlow/10 border border-primaryGlow/25 flex items-center justify-center text-primaryGlow">
-              <ClipboardList className="w-5 h-5" />
-            </div>
+      {/* ── RESUME STATUS BANNER ── */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-5 rounded-2xl border border-primaryGlow/25 bg-[#071021]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primaryGlow/10 border border-primaryGlow/20 flex items-center justify-center text-primaryGlow shrink-0 mt-0.5">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs font-black text-white uppercase tracking-wider font-space">Streamlined Job Applications</p>
+            <p className="text-[10px] text-mutedGray font-outfit mt-1 leading-relaxed">
+              You can apply to open roles directly by uploading a fresh resume PDF on the Available Jobs page. 
+              Additionally, you can run private AI self-improvement feedback analysis optionally on the Resume page (which is kept 100% private to you).
+            </p>
           </div>
         </div>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => navigate('/candidate/jobs')}
+            className="px-4 py-2.5 rounded-xl bg-primaryGlow text-black text-xs font-bold uppercase tracking-wider font-space hover:scale-105 transition-all cursor-pointer"
+          >
+            Explore Jobs
+          </button>
+          <button
+            onClick={() => navigate('/candidate/resume')}
+            className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-wider font-space hover:bg-white/10 transition-all cursor-pointer"
+          >
+            Private Analysis
+          </button>
+        </div>
+      </motion.div>
 
-        <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 hover:border-[#4FFAF0]/25 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space">Shortlisted</p>
-              <h3 className="text-3xl font-black text-white mt-3 font-space">{stats.shortlisted}</h3>
-              <span className="text-[9px] text-primaryGlow font-bold mt-1 block font-space uppercase">Proceeding Stage</span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-[#4FFAF0]/10 border border-[#4FFAF0]/25 flex items-center justify-center text-[#4FFAF0]">
-              <Trophy className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 hover:border-[#FFD166]/25 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space">Upcoming Interviews</p>
-              <h3 className="text-3xl font-black text-white mt-3 font-space">{stats.upcoming}</h3>
-              <span className="text-[9px] text-[#FFD166] font-bold mt-1 block font-space uppercase">Ready for Panels</span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FFD166]/10 border border-[#FFD166]/25 flex items-center justify-center text-[#FFD166]">
-              <Calendar className="w-5 h-5" />
+      {/* TOP METRIC CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Applications', value: stats.total, icon: ClipboardList, color: 'primaryGlow', sub: 'Active Pipelines' },
+          { label: 'Shortlisted', value: stats.shortlisted, icon: Trophy, color: '[#4FFAF0]', sub: 'Proceeding Stage' },
+          { label: 'Upcoming Interviews', value: stats.upcoming, icon: Calendar, color: '[#FFD166]', sub: 'Ready for Panels' },
+          { label: 'Open Jobs', value: jobs.filter(j => j.status === 'published').length, icon: Briefcase, color: 'accentGlow', sub: 'Available Now' },
+        ].map(({ label, value, icon: Icon, color, sub }) => (
+          <div key={label} className={`p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 hover:border-${color}/25 transition-all duration-300`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space">{label}</p>
+                <h3 className={`text-3xl font-black text-${color} mt-3 font-space`}>{value}</h3>
+                <span className={`text-[9px] text-${color} font-bold mt-1 block font-space uppercase`}>{sub}</span>
+              </div>
+              <div className={`w-10 h-10 rounded-xl bg-${color}/10 border border-${color}/25 flex items-center justify-center text-${color}`}>
+                <Icon className="w-5 h-5" />
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 hover:border-accentGlow/25 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space">Open Jobs</p>
-              <h3 className="text-3xl font-black text-white mt-3 font-space">{jobs.filter(j => j.status === 'published').length}</h3>
-              <span className="text-[9px] text-accentGlow font-bold mt-1 block font-space uppercase">Available Now</span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-accentGlow/10 border border-accentGlow/25 flex items-center justify-center text-accentGlow">
-              <Briefcase className="w-5 h-5 animate-pulse" />
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* CHARTS — driven by real application data */}
+      {/* CHARTS */}
       <div className="space-y-6">
         <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">Live Application Analytics</h4>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Pie: Status Distribution */}
           <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
@@ -176,23 +169,11 @@ export default function CandidateDashboard() {
             <div className="h-56 w-full text-xs">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={statusDistribution}
-                    cx="50%" cy="50%"
-                    innerRadius={50} outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {statusDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
+                  <Pie data={statusDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                    {statusDistribution.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}
                   </Pie>
                   <Tooltip contentStyle={{ backgroundColor: '#071021', borderColor: 'rgba(255,255,255,0.1)', color: '#FFFFFF' }} />
-                  <Legend
-                    layout="horizontal" verticalAlign="bottom" align="center"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: '9px', fontFamily: 'monospace', textTransform: 'uppercase', paddingTop: '10px' }}
-                  />
+                  <Legend layout="horizontal" verticalAlign="bottom" align="center" iconSize={8} wrapperStyle={{ fontSize: '9px', fontFamily: 'monospace', textTransform: 'uppercase', paddingTop: '10px' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -236,14 +217,11 @@ export default function CandidateDashboard() {
             </div>
           </div>
 
-          {/* Upcoming Interviews Live Feed */}
+          {/* Upcoming Interviews */}
           <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
             <div className="flex items-center justify-between">
               <h5 className="text-[11px] font-bold uppercase tracking-wider text-white font-space">Upcoming Interviews</h5>
-              <button
-                onClick={() => navigate('/candidate/interviews')}
-                className="text-[9px] text-primaryGlow hover:text-white font-space uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-              >
+              <button onClick={() => navigate('/candidate/applications')} className="text-[9px] text-primaryGlow hover:text-white font-space uppercase tracking-wider flex items-center gap-1 cursor-pointer">
                 View All <ArrowRight className="w-3 h-3" />
               </button>
             </div>
@@ -261,11 +239,7 @@ export default function CandidateDashboard() {
                       <span className="text-[9px] text-mutedGray block font-outfit mt-0.5">{iv.stage}</span>
                       <span className="text-[9px] text-primaryGlow block font-space mt-0.5">{iv.date} @ {iv.time}</span>
                     </div>
-                    <span className={`text-[8px] px-2 py-0.5 rounded border font-bold uppercase tracking-wider font-space ${
-                      iv.status === 'Confirmed' ? 'border-primaryGlow/30 bg-primaryGlow/10 text-primaryGlow' :
-                      iv.status === 'Completed' ? 'border-success/30 bg-success/10 text-success' :
-                      'border-white/10 bg-white/5 text-mutedGray'
-                    }`}>{iv.status}</span>
+                    <span className={`text-[8px] px-2 py-0.5 rounded border font-bold uppercase tracking-wider font-space ${iv.status === 'Confirmed' ? 'border-primaryGlow/30 bg-primaryGlow/10 text-primaryGlow' : iv.status === 'Completed' ? 'border-success/30 bg-success/10 text-success' : 'border-white/10 bg-white/5 text-mutedGray'}`}>{iv.status}</span>
                   </div>
                 ))}
               </div>
@@ -274,28 +248,23 @@ export default function CandidateDashboard() {
         </div>
       </div>
 
-      {/* BOTTOM: Quick navigation + recent activity */}
+
+
+      {/* BOTTOM: Recent Applications + Quick Links */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* My Recent Applications */}
+        {/* Recent Applications */}
         <div className="p-7 rounded-2xl glass-panel bg-white/2 border border-white/5 space-y-5 text-left">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">Recent Applications</h4>
-            <button
-              onClick={() => navigate('/candidate/applications')}
-              className="text-[9px] text-primaryGlow hover:text-white font-space uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-            >
+            <button onClick={() => navigate('/candidate/applications')} className="text-[9px] text-primaryGlow hover:text-white font-space uppercase tracking-wider flex items-center gap-1 cursor-pointer">
               All <ArrowRight className="w-3 h-3" />
             </button>
           </div>
-
           {myApplications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <Briefcase className="w-8 h-8 text-mutedGray/40" />
               <p className="text-[10px] text-mutedGray font-space uppercase">No applications yet</p>
-              <button
-                onClick={() => navigate('/candidate/jobs')}
-                className="px-4 py-2 rounded-lg bg-primaryGlow text-black text-[10px] font-bold uppercase tracking-wider font-space cursor-pointer hover:scale-105 transition-transform"
-              >
+              <button onClick={() => navigate('/candidate/jobs')} className="px-4 py-2 rounded-lg bg-primaryGlow text-black text-[10px] font-bold uppercase tracking-wider font-space cursor-pointer hover:scale-105 transition-transform">
                 Browse Jobs
               </button>
             </div>
@@ -322,12 +291,11 @@ export default function CandidateDashboard() {
         {/* Quick Links */}
         <div className="p-7 rounded-2xl glass-panel bg-white/2 border border-white/5 space-y-5 text-left">
           <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">Workspace Quadrants</h4>
-
           <div className="flex flex-col gap-3">
             {[
               { path: '/candidate/jobs', icon: <Briefcase className="w-5 h-5 text-primaryGlow" />, label: 'Browse Open Jobs', desc: 'View and apply to live requirements' },
               { path: '/candidate/applications', icon: <ClipboardList className="w-5 h-5 text-secondaryGlow" />, label: 'My Applications', desc: 'Track all submitted applications' },
-              { path: '/candidate/interviews', icon: <Calendar className="w-5 h-5 text-[#FFD166]" />, label: 'Interview Schedule', desc: 'View upcoming interview slots' },
+              { path: '/candidate/resume', icon: <FileText className="w-5 h-5 text-[#FFD166]" />, label: 'Resume & AI Feedback', desc: 'Upload resume and get AI analysis' },
               { path: '/candidate/rankings', icon: <Trophy className="w-5 h-5 text-accentGlow" />, label: 'Rank Leaderboard', desc: 'View comparison indices and stats' },
               { path: '/candidate/profile', icon: <Cpu className="w-5 h-5 text-[#FF5EB5]" />, label: 'My Profile', desc: 'Update your skills and resume' },
             ].map(item => (
@@ -343,7 +311,7 @@ export default function CandidateDashboard() {
                     <span className="text-[10px] text-mutedGray block font-outfit">{item.desc}</span>
                   </div>
                 </div>
-                <ArrowRight className="w-4.5 h-4.5 text-mutedGray" />
+                <ArrowRight className="w-4 h-4 text-mutedGray" />
               </button>
             ))}
           </div>

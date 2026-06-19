@@ -1,10 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CloudUpload, Cpu, Terminal, CheckCircle2, Star, GraduationCap, Briefcase, Code, AlertCircle, RefreshCw, Sparkles, Brain } from 'lucide-react';
+import { CloudUpload, Cpu, Terminal, CheckCircle2, ShieldAlert, Award, Star, GraduationCap, Briefcase, Code, AlertCircle, RefreshCw, Sparkles, Brain, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
 
 const API_BASE = ''; // Using Vite proxy
+
+const safeParseArray = (val: any): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+      if (typeof parsed === 'string') {
+        return parsed.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    } catch {
+      return val.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+};
 
 export default function ResumeUpload() {
   const { user } = useAuth();
@@ -16,16 +33,76 @@ export default function ResumeUpload() {
   const [hasError, setHasError] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [extractedData, setExtractedData] = useState<any>(null);
-  
-  // New Feedback states
-  const [feedback, setFeedback] = useState<any>(null);
-  const [generatingFeedback, setGeneratingFeedback] = useState(false);
-  
+
+  // Flow 1 Private Self Analysis state
+  const [selfAnalysis, setSelfAnalysis] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
   const consoleBottomRef = useRef<HTMLDivElement>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('ats_token') : null;
 
   const addLog = (msg: string) => setConsoleLogs(prev => [...prev, msg]);
+
+  // Load status and latest analysis on mount
+  useEffect(() => {
+    const fetchStatusAndAnalysis = async () => {
+      if (!token) return;
+      try {
+        const statusRes = await fetch(`${API_BASE}/api/resume/status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const statusData = await statusRes.json();
+        if (statusRes.ok && statusData.hasResume) {
+          setIsDone(true);
+          setExtractedData({
+            name: user ? `${user.first_name} ${user.last_name}` : 'Candidate',
+            email: user?.email || '',
+            filename: statusData.filename || 'resume.pdf',
+            textLength: statusData.textLength || 0,
+          });
+
+          // Fetch latest analysis
+          const analysisRes = await fetch(`${API_BASE}/api/resume/analysis/latest`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const analysisData = await analysisRes.json();
+          if (analysisRes.ok && analysisData.success) {
+            setSelfAnalysis(analysisData.analysis);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load resume status or latest analysis:', err);
+      }
+    };
+    fetchStatusAndAnalysis();
+  }, [token, user]);
+
+  const triggerSelfAnalysis = async () => {
+    if (!token) return;
+    setAnalyzing(true);
+    addLog('🧠 INITIATING PRIVATE AI RESUME SELF-ANALYSIS...');
+    try {
+      const response = await fetch(`${API_BASE}/api/resume/analyze`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Analysis failed');
+      }
+      setSelfAnalysis(data.analysis);
+      addLog('📊 PRIVATE SCORING MATRIX COMPUTED SUCCESSFULLY');
+      toast.success('Self-Analysis Complete!', {
+        description: 'Your private resume analysis dashboard has been updated.'
+      });
+    } catch (err: any) {
+      addLog(`❌ ANALYSIS ERROR: ${err.message}`);
+      toast.error('Self-analysis failed: ' + err.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const uploadResume = async (selectedFile: File) => {
     if (!token) {
@@ -44,6 +121,7 @@ export default function ResumeUpload() {
     setHasError(false);
     setConsoleLogs([]);
     setExtractedData(null);
+    setSelfAnalysis(null);
 
     // Phase 1: Show startup logs
     const startupLogs = [
@@ -77,7 +155,7 @@ export default function ResumeUpload() {
       });
 
       setProgress(75);
-      addLog('🧠 RUNNING GEMINI AI ANALYSIS...');
+      addLog('🧠 STORED RESUME DETAILS TO CLOUD DATABASE...');
 
       const data = await response.json();
 
@@ -86,10 +164,7 @@ export default function ResumeUpload() {
       }
 
       setProgress(90);
-      addLog('📊 SCORING TECHNICAL COMPETENCY MATRIX...');
-      await new Promise(r => setTimeout(r, 600));
-
-      addLog('🎯 COMPUTING ALIGNMENT METRICS...');
+      addLog('🎯 EXTRACTION VERIFIED...');
       await new Promise(r => setTimeout(r, 500));
       setProgress(100);
 
@@ -107,19 +182,17 @@ export default function ResumeUpload() {
       };
 
       addLog(`✅ EXTRACTION COMPLETE: ${data.textLength} characters analyzed`);
-      addLog(`📈 EXPERIENCE DETECTED: ${extracted.experienceYears} year(s)`);
-      addLog(`🎓 EDUCATION: ${extracted.education}`);
-      addLog(`🚀 STATUS: Resume stored & ready for AI screening`);
+      addLog(`🚀 STATUS: Resume stored & ready for self-analysis`);
 
       setExtractedData(extracted);
-      setFeedback(null); // reset feedback on new upload
       setIsDone(true);
       setUploading(false);
       localStorage.setItem('has_uploaded_resume', 'true');
+      localStorage.setItem('resume_uploaded_skills', JSON.stringify(data.skills || []));
 
-      toast.success('Resume Analyzed Successfully!', {
-        description: `${selectedFile.name} processed. AI screening will use this resume when recruiters view your application.`,
-      });
+      // Proactively trigger the Flow 1 self-analysis report
+      await triggerSelfAnalysis();
+
     } catch (err: any) {
       addLog(`❌ ERROR: ${err.message}`);
       setHasError(true);
@@ -153,16 +226,23 @@ export default function ResumeUpload() {
     consoleBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [consoleLogs]);
 
+  // Extract analysis fields safely
+  const resumeScore = selfAnalysis?.resume_score ?? selfAnalysis?.resumeScore ?? 0;
+  const atsScore = selfAnalysis?.ats_score ?? selfAnalysis?.atsScore ?? 0;
+  const strengths = safeParseArray(selfAnalysis?.strengths);
+  const missingSkills = safeParseArray(selfAnalysis?.missing_skills ?? selfAnalysis?.missingSkills);
+  const suggestions = safeParseArray(selfAnalysis?.suggestions);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 text-left">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
           <Brain className="w-6 h-6 text-primaryGlow" />
-          <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">AI Resume Screening</h2>
+          <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">Resume Analyzer</h2>
         </div>
         <p className="text-mutedGray text-xs font-outfit">
-          Upload your PDF resume to run real Gemini AI analysis. Your resume will be used for automatic screening when recruiters review your application.
+          Upload and run self-improvement analysis on your resume. Improve your ATS visibility and profile scoring before applying to roles.
         </p>
         {!token && (
           <div className="mt-3 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-outfit flex items-center gap-2">
@@ -180,9 +260,8 @@ export default function ResumeUpload() {
           <div
             onDragEnter={handleDrag} onDragOver={handleDrag}
             onDragLeave={handleDrag} onDrop={handleDrop}
-            className={`relative border-2 border-dashed rounded-2xl p-8 text-center bg-[#071021]/20 flex flex-col items-center justify-center gap-4 transition-all duration-300 ${
-              dragActive ? 'border-primaryGlow bg-primaryGlow/5 scale-[0.99]' : 'border-white/10 hover:border-primaryGlow/30'
-            } ${uploading ? 'pointer-events-none opacity-70' : ''}`}
+            className={`relative border-2 border-dashed rounded-2xl p-8 text-center bg-[#071021]/20 flex flex-col items-center justify-center gap-4 transition-all duration-300 ${dragActive ? 'border-primaryGlow bg-primaryGlow/5 scale-[0.99]' : 'border-white/10 hover:border-primaryGlow/30'
+              } ${uploading ? 'pointer-events-none opacity-70' : ''}`}
           >
             <input
               type="file" accept=".pdf"
@@ -214,8 +293,8 @@ export default function ResumeUpload() {
                 <span className="text-[10px] font-black uppercase tracking-wider font-space text-white">Gemini AI Console</span>
               </div>
               <div className="flex items-center gap-1.5">
-                {uploading && <span className="text-[9px] text-primaryGlow font-space animate-pulse">PROCESSING</span>}
-                <span className={`w-2.5 h-2.5 rounded-full ${uploading ? 'bg-primaryGlow animate-ping' : isDone ? 'bg-success' : 'bg-white/20'}`} />
+                {(uploading || analyzing) && <span className="text-[9px] text-primaryGlow font-space animate-pulse">PROCESSING</span>}
+                <span className={`w-2.5 h-2.5 rounded-full ${(uploading || analyzing) ? 'bg-primaryGlow animate-ping' : isDone ? 'bg-success' : 'bg-white/20'}`} />
               </div>
             </div>
 
@@ -231,7 +310,7 @@ export default function ResumeUpload() {
               )}
               {hasError && (
                 <div className="text-error mt-2 font-bold">
-                  ⚠️ Upload failed. Check that backend is running at port 5000 and try again.
+                  ⚠️ Upload failed. Check that backend is running and try again.
                 </div>
               )}
               <div ref={consoleBottomRef} />
@@ -241,7 +320,7 @@ export default function ResumeUpload() {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-[9px] font-bold uppercase font-space">
                   <span className={isDone ? 'text-success' : 'text-primaryGlow'}>
-                    {isDone ? 'Analysis Complete' : 'AI Parsing Stream'}
+                    {isDone ? 'Ingestion Complete' : 'AI Ingestion Stream'}
                   </span>
                   <span className={isDone ? 'text-success' : 'text-primaryGlow'}>{progress}%</span>
                 </div>
@@ -258,7 +337,7 @@ export default function ResumeUpload() {
 
         {/* Right: Results */}
         <div className="lg:col-span-7 space-y-6">
-          <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">AI Extraction Report</h4>
+          <h4 className="text-xs font-black uppercase tracking-wider text-white font-space">AI Self-Analysis report</h4>
 
           <AnimatePresence mode="wait">
             {!isDone ? (
@@ -273,7 +352,7 @@ export default function ResumeUpload() {
                 <div>
                   <h5 className="text-sm font-bold text-white uppercase tracking-wider font-space">Awaiting Resume Upload</h5>
                   <p className="text-xs text-mutedGray font-outfit mt-1 max-w-xs mx-auto">
-                    Upload your PDF resume for real Gemini AI analysis. Skills, experience, and education will be extracted automatically.
+                    Upload your PDF resume to run the private self-improvement analysis. Get instant ratings on your resume formatting and keyword alignment.
                   </p>
                 </div>
               </motion.div>
@@ -293,143 +372,118 @@ export default function ResumeUpload() {
                       </div>
                       <div>
                         <h5 className="text-base font-bold text-white font-space uppercase tracking-wide">{extractedData?.name}</h5>
-                        <span className="text-xs text-mutedGray block font-outfit">{extractedData?.title} · {extractedData?.email}</span>
+                        <span className="text-xs text-mutedGray block font-outfit">{extractedData?.email} · {extractedData?.filename}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 text-right">
                       <span className="bg-success/15 border border-success/35 text-success text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider font-space flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Analyzed ✓
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Resume Ingested ✓
                       </span>
-                      <span className="text-[9px] text-mutedGray font-outfit">{extractedData?.textLength} chars extracted</span>
                     </div>
                   </div>
 
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Experience', value: `${extractedData?.experienceYears} yr${extractedData?.experienceYears !== 1 ? 's' : ''}` },
-                      { label: 'Education', value: extractedData?.education?.split(',')[0] || 'Detected' },
-                      { label: 'File', value: extractedData?.filename?.split('.')[0] || 'Resume' },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="p-3 rounded-xl bg-white/2 border border-white/5 text-center">
-                        <div className="text-[9px] text-mutedGray uppercase tracking-wider font-space">{label}</div>
-                        <div className="text-xs font-bold text-white font-outfit mt-1 truncate">{value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Extracted Skills */}
-                  {extractedData?.skills?.length > 0 && (
-                    <div className="space-y-2">
-                      <h6 className="text-[10px] font-bold uppercase tracking-wider text-mutedGray font-space flex items-center gap-1.5">
-                        <Star className="w-4 h-4 text-primaryGlow" /> AI-Extracted Skills
-                      </h6>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {extractedData.skills.map((skill: string, i: number) => (
-                          <span key={i} className="text-[9px] font-bold text-primaryGlow bg-primaryGlow/10 border border-primaryGlow/25 px-2.5 py-1 rounded-full font-space uppercase">
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl bg-white/2 border border-white/5 space-y-2">
-                      <h6 className="text-[9px] font-bold uppercase tracking-wider text-mutedGray font-space flex items-center gap-1.5">
-                        <Briefcase className="w-3.5 h-3.5 text-primaryGlow" /> Experience
-                      </h6>
-                      <p className="text-xs text-white font-outfit">{extractedData?.experienceYears} year(s) of professional experience</p>
-                    </div>
-                    <div className="p-4 rounded-xl bg-white/2 border border-white/5 space-y-2">
-                      <h6 className="text-[9px] font-bold uppercase tracking-wider text-mutedGray font-space flex items-center gap-1.5">
-                        <GraduationCap className="w-3.5 h-3.5 text-primaryGlow" /> Education
-                      </h6>
-                      <p className="text-xs text-white font-outfit">{extractedData?.education}</p>
+                  {/* Private Shield Banner */}
+                  <div className="p-4 rounded-xl bg-secondaryGlow/5 border border-secondaryGlow/20 flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-secondaryGlow shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs font-bold text-secondaryGlow font-space uppercase tracking-wide">🔒 Private Report Boundary</div>
+                      <p className="text-[10px] text-mutedGray font-outfit mt-0.5 leading-relaxed">
+                        This self-improvement analysis and these scores are strictly <strong>private to you</strong>. Recruiters will never see these scores or suggestions.
+                      </p>
                     </div>
                   </div>
 
-                  {/* AI Ready Banner */}
-                  <div className="p-4 rounded-xl bg-primaryGlow/5 border border-primaryGlow/20 flex items-center gap-3">
-                    <Brain className="w-5 h-5 text-primaryGlow shrink-0" />
-                    <div className="flex-1">
-                      <div className="text-xs font-bold text-primaryGlow font-space uppercase tracking-wide">AI Screening Ready</div>
-                      <div className="text-[10px] text-mutedGray font-outfit mt-0.5">
-                        Recruiters who view your application report will now get a real Gemini AI analysis of this resume vs the job requirements.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Constructive Feedback Section */}
-                  {feedback ? (
-                    <div className="p-5 rounded-xl border border-white/10 bg-black/40 space-y-4">
-                      <h4 className="text-xs font-black text-white font-space uppercase flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-primaryGlow" /> Career Feedback
-                      </h4>
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-[10px] text-mutedGray uppercase font-space font-bold">Skill Gap Analysis</span>
-                          <p className="text-xs text-white mt-1 leading-relaxed">{feedback.skillGapAnalysis}</p>
+                  {/* Flow 1 Private Scores */}
+                  {selfAnalysis ? (
+                    <div className="space-y-6">
+                      {/* Scores display */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-5 rounded-xl bg-white/2 border border-white/5 text-center flex flex-col items-center justify-center">
+                          <span className="text-[9px] text-mutedGray uppercase tracking-wider font-space">Resume Score</span>
+                          <span className="text-3xl font-black text-white font-space mt-2">{resumeScore}/100</span>
                         </div>
-                        {feedback.suggestedCourses?.length > 0 && (
-                          <div>
-                            <span className="text-[10px] text-mutedGray uppercase font-space font-bold">Suggested Courses</span>
-                            <ul className="mt-1 space-y-1">
-                              {feedback.suggestedCourses.map((c: string, i: number) => (
-                                <li key={i} className="text-xs text-white flex items-center gap-2">
-                                  <span className="w-1 h-1 rounded-full bg-primaryGlow" /> {c}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {feedback.resumeImprovementTips?.length > 0 && (
-                          <div>
-                            <span className="text-[10px] text-mutedGray uppercase font-space font-bold">Improvement Tips</span>
-                            <ul className="mt-1 space-y-1">
-                              {feedback.resumeImprovementTips.map((t: string, i: number) => (
-                                <li key={i} className="text-xs text-white flex items-center gap-2">
-                                  <span className="w-1 h-1 rounded-full bg-primaryGlow" /> {t}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                        <div className="p-5 rounded-xl bg-white/2 border border-white/5 text-center flex flex-col items-center justify-center">
+                          <span className="text-[9px] text-mutedGray uppercase tracking-wider font-space">ATS Score</span>
+                          <span className="text-3xl font-black text-[#FFD166] font-space mt-2">{atsScore}/100</span>
+                        </div>
                       </div>
+
+                      {/* Strengths */}
+                      {strengths.length > 0 && (
+                        <div className="space-y-2 text-left">
+                          <h6 className="text-[10px] font-black uppercase tracking-wider text-white font-space flex items-center gap-1.5">
+                            <Award className="w-4 h-4 text-primaryGlow" /> Resume Strengths
+                          </h6>
+                          <ul className="space-y-2">
+                            {strengths.map((str: string, i: number) => (
+                              <li key={i} className="text-xs text-mutedGray flex items-start gap-2.5 leading-relaxed font-outfit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 mt-2" />
+                                <span>{str}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Missing Skills */}
+                      {missingSkills.length > 0 && (
+                        <div className="space-y-2 text-left">
+                          <h6 className="text-[10px] font-black uppercase tracking-wider text-white font-space flex items-center gap-1.5">
+                            <Code className="w-4 h-4 text-secondaryGlow" /> Missing Skills
+                          </h6>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {missingSkills.map((skill: string, i: number) => (
+                              <span key={i} className="text-[9px] font-bold text-error bg-error/10 border border-error/25 px-2.5 py-1 rounded-full font-space uppercase">
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Improvement Suggestions */}
+                      {suggestions.length > 0 && (
+                        <div className="space-y-2 text-left border-t border-white/5 pt-4">
+                          <h6 className="text-[10px] font-black uppercase tracking-wider text-white font-space flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4 text-[#FFD166] animate-pulse" /> Improvement Suggestions
+                          </h6>
+                          <ul className="space-y-2">
+                            {suggestions.map((sug: string, i: number) => (
+                              <li key={i} className="text-xs text-mutedGray flex items-start gap-2.5 leading-relaxed font-outfit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#FFD166] shrink-0 mt-2" />
+                                <span>{sug}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <button 
-                      onClick={async () => {
-                        setGeneratingFeedback(true);
-                        try {
-                          const res = await fetch(`${API_BASE}/api/resume/feedback`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ targetRole: user?.preferredRole || 'Software Engineer' })
-                          });
-                          const data = await res.json();
-                          if(data.success) setFeedback(data.feedback);
-                          else throw new Error(data.error);
-                        } catch(e: any) {
-                          toast.error('Failed to generate feedback: ' + e.message);
-                        } finally {
-                          setGeneratingFeedback(false);
-                        }
-                      }}
-                      disabled={generatingFeedback}
-                      className="w-full py-3 rounded-xl border border-primaryGlow/30 bg-primaryGlow/5 text-primaryGlow text-xs font-bold font-space uppercase tracking-wider hover:bg-primaryGlow/10 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {generatingFeedback ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      Generate Constructive Career Feedback
-                    </button>
+                    <div className="p-8 text-center bg-white/2 border border-white/5 rounded-xl space-y-4">
+                      {analyzing ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-primaryGlow animate-spin" />
+                          <span className="text-xs text-mutedGray font-space uppercase">Generating Private analysis...</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <span className="text-xs text-mutedGray font-outfit block">No self-analysis scores computed for this resume.</span>
+                          <button
+                            onClick={triggerSelfAnalysis}
+                            className="px-5 py-2.5 rounded-xl bg-primaryGlow text-black text-xs font-bold font-space uppercase tracking-wider hover:scale-103 transition-all cursor-pointer"
+                          >
+                            Analyze Resume Now
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
                 {/* Re-upload button */}
                 <button
-                  onClick={() => { setIsDone(false); setConsoleLogs([]); setFile(null); }}
-                  className="flex items-center gap-2 text-xs text-mutedGray hover:text-white transition-colors font-outfit"
+                  onClick={() => { setIsDone(false); setConsoleLogs([]); setFile(null); setSelfAnalysis(null); }}
+                  className="flex items-center gap-2 text-xs text-mutedGray hover:text-white transition-colors font-outfit mt-4"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Upload a different resume
                 </button>

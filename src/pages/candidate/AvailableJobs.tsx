@@ -2,12 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Briefcase, Calendar, MapPin, DollarSign, Filter, ArrowRight, X, Sparkles, CheckCircle2, Loader2, UploadCloud } from 'lucide-react';
 import { useApplication } from '../../contexts/ApplicationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { JobPost } from '../../api/mockData';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../../api/apiClient';
 
 export default function AvailableJobs() {
-  const { jobs, myApplications, applyForJob } = useApplication();
+  const { jobs, myApplications, candidates, applyForJob } = useApplication();
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [selectedJob, setSelectedJob] = useState<JobPost & { relevanceScore?: number } | null>(null);
@@ -18,11 +21,27 @@ export default function AvailableJobs() {
   const [profile, setProfile] = useState<any>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [pendingJob, setPendingJob] = useState<JobPost | null>(null);
+  const [resumeSkills, setResumeSkills] = useState<string[]>([]);
+  const [uploadFileForJob, setUploadFileForJob] = useState<File | null>(null);
 
   useEffect(() => {
     const p = localStorage.getItem('user_detailed_profile');
     if (p) setProfile(JSON.parse(p));
-  }, []);
+
+    const localSkills = localStorage.getItem('resume_uploaded_skills');
+    if (localSkills) {
+      try {
+        setResumeSkills(JSON.parse(localSkills));
+      } catch {}
+    }
+
+    apiClient.getResumeStatus().then(status => {
+      if (status.hasResume && status.skills) {
+        setResumeSkills(status.skills);
+        localStorage.setItem('resume_uploaded_skills', JSON.stringify(status.skills));
+      }
+    }).catch(() => {});
+  }, [myApplications]);
 
   const appliedJobIds = useMemo(() => myApplications.map(a => a.jobId), [myApplications]);
 
@@ -32,26 +51,31 @@ export default function AvailableJobs() {
       return;
     }
     
-    // Check for Resume Upload (Enforced Workflow)
-    const hasResume = localStorage.getItem('has_uploaded_resume') === 'true';
-    if (!hasResume) {
-      setPendingJob(job);
-      setShowResumeModal(true);
-      return;
-    }
-
-    proceedWithApplication(job);
+    // Reset and open upload modal for this job
+    setPendingJob(job);
+    setUploadFileForJob(null);
+    setShowResumeModal(true);
   };
 
-  const proceedWithApplication = async (job: JobPost) => {
+  const proceedWithApplication = async (job: JobPost, resumeFile: File) => {
+    if (!resumeFile) return;
     setApplyingId(job.id);
     try {
-      await applyForJob(job.id);
+      const res = await applyForJob(job.id, resumeFile);
       toast.success('Application Submitted!', {
         description: `Your profile has been synced to the ${job.title} hiring funnel.`,
       });
+      
+      // Save the latest resume skills from response to trigger re-ranking
+      if (res && res.application && res.application.detected_skills) {
+        const skillsArray = res.application.detected_skills.split(',').map((s: string) => s.trim()).filter(Boolean);
+        localStorage.setItem('latest_resume_skills', JSON.stringify(skillsArray));
+        setResumeSkills(skillsArray);
+      }
+
       setShowResumeModal(false);
       setPendingJob(null);
+      setUploadFileForJob(null);
       if (selectedJob?.id === job.id) setSelectedJob(null);
     } catch (err: any) {
       if (!err?.message?.includes('duplicate') && !err?.message?.includes('unique')) {
@@ -64,42 +88,115 @@ export default function AvailableJobs() {
 
   const allSkills = Array.from(new Set(jobs.flatMap((j) => j.skills)));
 
-  // Smart Ranking Logic
-  const rankedJobs = useMemo(() => {
-    let list = [...jobs];
+  // Custom helper to normalize skill name to title casing / abbreviations
+  const normalizeSkillName = (skill: string): string => {
+    const s = skill.trim().toLowerCase();
+    if (s === 'java') return 'Java';
+    if (s === 'javascript' || s === 'js') return 'JavaScript';
+    if (s === 'typescript' || s === 'ts') return 'TypeScript';
+    if (s === 'mysql') return 'MySQL';
+    if (s === 'aws') return 'AWS';
+    if (s === 'git') return 'Git';
+    if (s === 'rest api' || s === 'rest' || s === 'restful api') return 'REST API';
+    if (s === 'css') return 'CSS';
+    if (s === 'html') return 'HTML';
+    if (s === 'spring boot') return 'Spring Boot';
+    if (s === 'node.js' || s === 'nodejs') return 'Node.js';
+    if (s === 'python') return 'Python';
+    if (s === 'react') return 'React';
+    if (s === 'docker') return 'Docker';
+    if (s === 'kubernetes') return 'Kubernetes';
+    if (s === 'sql') return 'SQL';
     
-    if (profile) {
-      list = list.map(job => {
-        let score = 0;
-        const jobSkillsLow = job.skills.map(s => s.toLowerCase());
-        const profSkillsLow = profile.skills?.map((s: string) => s.toLowerCase()) || [];
-        const matchCount = profSkillsLow.filter((s: string) => jobSkillsLow.includes(s)).length;
-        if (jobSkillsLow.length > 0) {
-          score += (matchCount / jobSkillsLow.length) * 50; // up to 50 pts
+    return skill.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
+
+  // ── Combined profile & resume skills list ──────────────────────────────────
+  const candidateAllSkills = useMemo(() => {
+    const skillsSet = new Set<string>();
+
+    // 1. Candidate Profile Skills
+    const profileStored = localStorage.getItem('user_detailed_profile');
+    if (profileStored) {
+      try {
+        const parsed = JSON.parse(profileStored);
+        if (parsed.skills) {
+          parsed.skills.split(',').forEach((s: string) => {
+            const norm = normalizeSkillName(s);
+            if (norm) skillsSet.add(norm);
+          });
         }
-        
-        const jobTitle = job.title.toLowerCase();
-        const profRole = (profile.preferredRole || '').toLowerCase();
-        if (profRole && jobTitle.includes(profRole)) score += 30; // up to 30 pts
-        
-        // Experience match 20 pts
-        const reqText = job.requirements.join(' ').toLowerCase();
-        const profExpStr = profile.experienceLevel || '';
-        if (profExpStr) {
-          if (reqText.includes('5+') && profExpStr.includes('5')) score += 20;
-          else if ((reqText.includes('3-4') || reqText.includes('mid')) && profExpStr.includes('3-5')) score += 20;
-          else if ((reqText.includes('1-2') || reqText.includes('junior')) && profExpStr.includes('1-2')) score += 20;
-          else if (!reqText.includes('5+') && !reqText.includes('senior')) score += 10;
-        }
-        
-        return { ...job, relevanceScore: Math.round(score) };
-      }).sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+      } catch {}
     }
 
-    return list.filter((job) => {
+    const myProfile = candidates?.find(c => c.email.toLowerCase() === user?.email?.toLowerCase());
+    if (myProfile && myProfile.skills) {
+      myProfile.skills.forEach((s: string) => {
+        const norm = normalizeSkillName(s);
+        if (norm) skillsSet.add(norm);
+      });
+    }
+
+    // 2. Latest Resume Skills
+    const localSkills = localStorage.getItem('latest_resume_skills');
+    if (localSkills) {
+      try {
+        const parsed = JSON.parse(localSkills);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((s: string) => {
+            const norm = normalizeSkillName(s);
+            if (norm) skillsSet.add(norm);
+          });
+        }
+      } catch {}
+    }
+
+    // Include general resumeSkills
+    resumeSkills.forEach(s => {
+      const norm = normalizeSkillName(s);
+      if (norm) skillsSet.add(norm);
+    });
+
+    return Array.from(skillsSet);
+  }, [candidates, user, resumeSkills]);
+
+  // Smart Ranking and Recommendation Logic
+  const rankedJobs = useMemo(() => {
+    // Calculate match score for all jobs first
+    const calculated = jobs.map((job, index) => {
+      const jobSkills = (job.skills || []).map(s => normalizeSkillName(s)).filter(Boolean);
+      if (jobSkills.length === 0) {
+        return {
+          ...job,
+          matchPercentage: 0,
+          matchedSkills: [] as string[],
+          isRecommended: false,
+          originalIndex: index
+        };
+      }
+
+      const matched = jobSkills.filter(skill =>
+        candidateAllSkills.includes(skill)
+      );
+
+      // Match Percentage = (Matched Skills Count / Total Required Skills Count) * 100
+      const matchPercentage = Math.round((matched.length / jobSkills.length) * 100);
+      const isRecommended = matchPercentage >= 60;
+
+      return {
+        ...job,
+        matchPercentage,
+        matchedSkills: matched,
+        isRecommended,
+        originalIndex: index
+      };
+    });
+
+    // Apply search and drop-down filters
+    const filtered = calculated.filter((job) => {
       const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             job.department.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSkill = selectedSkill === '' || job.skills.includes(selectedSkill);
+      const matchesSkill = selectedSkill === '' || job.skills.map(s => normalizeSkillName(s)).includes(normalizeSkillName(selectedSkill));
       let matchesExp = true;
       if (selectedExp !== '') {
         const reqText = job.requirements.join(' ').toLowerCase();
@@ -109,30 +206,134 @@ export default function AvailableJobs() {
       }
       return matchesSearch && matchesSkill && matchesExp;
     });
-  }, [jobs, profile, searchTerm, selectedSkill, selectedExp]);
+
+    // Sort: Recommended first, high percentage first, then original order
+    return filtered.sort((a, b) => {
+      // 1. Recommended jobs first
+      if (a.isRecommended && !b.isRecommended) return -1;
+      if (!a.isRecommended && b.isRecommended) return 1;
+      
+      // 2. Highest match percentage first
+      if (b.matchPercentage !== a.matchPercentage) {
+        return b.matchPercentage - a.matchPercentage;
+      }
+      
+      // 3. Keep original stable sorting order
+      return a.originalIndex - b.originalIndex;
+    });
+  }, [jobs, candidateAllSkills, searchTerm, selectedSkill, selectedExp]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 text-left relative">
       
-      {/* Resume Intercept Modal */}
+      {/* Job-Specific Resume Upload Modal */}
       <AnimatePresence>
-        {showResumeModal && (
+        {showResumeModal && pendingJob && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowResumeModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-full max-w-md bg-[#071021] border border-white/10 rounded-2xl p-8 shadow-2xl z-10 text-center space-y-6">
-              <div className="w-16 h-16 rounded-full bg-error/10 border border-error/20 text-error flex items-center justify-center mx-auto mb-4">
-                <UploadCloud className="w-8 h-8" />
-              </div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!applyingId) setShowResumeModal(false); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-full max-w-md bg-[#071021] border border-white/10 rounded-2xl p-6 shadow-2xl z-10 text-left space-y-6">
               <div>
-                <h3 className="text-xl font-black text-white uppercase tracking-wider font-space">Resume Required</h3>
-                <p className="text-mutedGray text-xs font-outfit mt-2">
-                  You must upload your resume before applying to {pendingJob?.title}. The AI engine needs your resume to calculate your match score.
+                <h3 className="text-lg font-black text-white uppercase tracking-wider font-space">Apply for {pendingJob.title}</h3>
+                <p className="text-mutedGray text-[10px] font-outfit mt-1">
+                  Upload your resume tailored for this position. This will not overwrite your resumes for other applications.
                 </p>
               </div>
+
+              {/* Upload Area */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const f = e.dataTransfer?.files?.[0];
+                  if (f && f.name.endsWith('.pdf')) {
+                    setUploadFileForJob(f);
+                  } else {
+                    toast.error('Only PDF files are accepted.');
+                  }
+                }}
+                className={`relative border border-dashed border-white/10 rounded-xl p-6 text-center bg-white/1 flex flex-col items-center justify-center gap-3 transition-colors ${
+                  uploadFileForJob ? 'border-success/30 bg-success/5' : 'hover:border-primaryGlow/30'
+                }`}
+              >
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      if (f.name.endsWith('.pdf')) {
+                        setUploadFileForJob(f);
+                      } else {
+                        toast.error('Only PDF files are accepted.');
+                      }
+                    }
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+
+                {uploadFileForJob ? (
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-lg bg-success/15 border border-success/30 text-success flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block truncate max-w-[220px] mx-auto">
+                        {uploadFileForJob.name}
+                      </span>
+                      <span className="text-[10px] text-mutedGray mt-0.5 block">
+                        {(uploadFileForJob.size / 1024).toFixed(0)} KB · Ready to apply
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-primaryGlow font-space uppercase font-bold hover:underline block pt-1 cursor-pointer">
+                      Click or drag to replace
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-lg bg-white/3 border border-white/6 flex items-center justify-center text-mutedGray">
+                      <UploadCloud className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block uppercase tracking-wider font-space">
+                        Select Resume PDF
+                      </span>
+                      <span className="text-[9px] text-mutedGray mt-0.5 block">
+                        Drag & drop or click to browse (PDF only, max 10MB)
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowResumeModal(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:border-white/20 text-xs font-bold text-white uppercase tracking-wider font-space">Cancel</button>
-                <button onClick={() => navigate('/candidate/resume')} className="flex-1 py-3 rounded-xl bg-primaryGlow text-black hover:scale-105 shadow-[0_0_15px_rgba(79,250,240,0.2)] transition-all text-xs font-bold uppercase tracking-wider font-space flex items-center justify-center gap-2">
-                  Go to Upload <ArrowRight className="w-3.5 h-3.5" />
+                <button
+                  disabled={!!applyingId}
+                  onClick={() => setShowResumeModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-white/10 hover:border-white/20 text-xs font-bold text-white uppercase tracking-wider font-space cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!uploadFileForJob || !!applyingId}
+                  onClick={() => proceedWithApplication(pendingJob, uploadFileForJob!)}
+                  className={`flex-1 py-3 rounded-xl text-black text-xs font-bold uppercase tracking-wider font-space flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    !uploadFileForJob || !!applyingId
+                      ? 'bg-white/10 text-white/30 border border-transparent cursor-not-allowed'
+                      : 'bg-primaryGlow hover:scale-105 shadow-[0_0_15px_rgba(79,250,240,0.2)]'
+                  }`}
+                >
+                  {applyingId ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Submit Application <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -179,47 +380,104 @@ export default function AvailableJobs() {
         ) : (
           rankedJobs.map((job: any) => {
             const hasApplied = appliedJobIds.includes(job.id);
-            const isTopMatch = (job.relevanceScore || 0) >= 60;
 
             return (
-              <motion.div key={job.id} layoutId={`card-${job.id}`} className={`p-6 rounded-2xl glass-panel bg-[#071021]/30 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden ${isTopMatch ? 'border-primaryGlow/40 shadow-[0_0_20px_rgba(79,250,240,0.05)]' : 'border-white/6 hover:border-white/20'}`}>
-                
-                {isTopMatch && (
-                  <div className="absolute top-0 right-0 bg-primaryGlow text-black text-[9px] font-bold uppercase font-space px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-[0_0_10px_rgba(79,250,240,0.5)]">
-                    <Sparkles className="w-3 h-3" /> Recommended Match
+              <motion.div
+                key={job.id}
+                layoutId={`card-${job.id}`}
+                className={`p-6 rounded-2xl glass-panel bg-[#071021]/30 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden ${
+                  job.isRecommended
+                    ? 'border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.08)]'
+                    : 'border-white/6 hover:border-white/20'
+                }`}
+              >
+                {job.isRecommended && (
+                  <div className="absolute top-0 right-0 bg-emerald-500 text-black text-[9px] font-bold uppercase font-space px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.5)]">
+                    ⭐ Recommended For You
                   </div>
                 )}
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-start mt-2">
                     <div>
-                      <h4 className="text-base font-bold text-white font-space uppercase tracking-wide line-clamp-1">{job.title}</h4>
-                      <span className="text-[10px] text-primaryGlow font-space uppercase tracking-wider block mt-1">{job.department}</span>
+                      <h4 className="text-base font-bold text-white font-space uppercase tracking-wide line-clamp-1">
+                        {job.title}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-primaryGlow font-space uppercase tracking-wider">
+                          {job.department}
+                        </span>
+                        <span className="text-[9px] text-white/40 font-outfit">•</span>
+                        <span
+                          className={`text-[10px] font-bold font-space uppercase ${
+                            job.isRecommended ? 'text-emerald-400' : 'text-mutedGray'
+                          }`}
+                        >
+                          Skill Match: {job.matchPercentage}%
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-2.5 text-[10px] text-mutedGray font-outfit">
-                    <span className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-primaryGlow shrink-0" /> {job.location}</span>
-                    <span className="flex items-center gap-2"><DollarSign className="w-3.5 h-3.5 text-primaryGlow shrink-0" /> ${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()} / year</span>
+                    <span className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-primaryGlow shrink-0" /> {job.location}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <DollarSign className="w-3.5 h-3.5 text-primaryGlow shrink-0" /> $
+                      {job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()} / year
+                    </span>
                   </div>
 
                   <div className="space-y-1.5">
-                    <span className="text-[9px] font-bold text-mutedGray uppercase tracking-wider font-space block">Skills Needed</span>
+                    <span className="text-[9px] font-bold text-mutedGray uppercase tracking-wider font-space block">
+                      Skills Needed
+                    </span>
                     <div className="flex gap-1.5 flex-wrap">
-                      {job.skills.slice(0, 3).map((s: string, idx: number) => (
-                        <span key={idx} className={`text-[9px] font-bold px-2 py-0.5 rounded-full font-space uppercase ${profile?.skills?.map((x:any)=>x.toLowerCase()).includes(s.toLowerCase()) ? 'text-primaryGlow bg-primaryGlow/10 border border-primaryGlow/30' : 'text-mutedGray bg-white/3 border border-white/5'}`}>
-                          {s}
-                        </span>
-                      ))}
-                      {job.skills.length > 3 && <span className="text-[9px] font-bold text-mutedGray bg-white/3 border border-white/5 px-2 py-0.5 rounded-full font-space">+{job.skills.length - 3} more</span>}
+                      {job.skills.map((s: string, idx: number) => {
+                        const isSkillMatched = candidateAllSkills.includes(s.trim().toLowerCase());
+                        return (
+                          <span
+                            key={idx}
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full font-space uppercase ${
+                              isSkillMatched
+                                ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/30'
+                                : 'text-mutedGray bg-white/3 border border-white/5'
+                            }`}
+                          >
+                            {s}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 mt-6 pt-4 border-t border-white/5">
-                  <button onClick={() => setSelectedJob(job)} className="flex-1 py-2.5 rounded-xl border border-white/6 hover:border-white/15 text-[10px] font-bold text-white uppercase tracking-wider font-space transition-colors">Details</button>
-                  <button onClick={() => handleApplyClick(job)} disabled={hasApplied} className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider font-space flex items-center justify-center gap-1 transition-all ${hasApplied ? 'bg-success/15 border border-success/20 text-success' : 'bg-primaryGlow text-black hover:scale-103 shadow-[0_0_12px_rgba(79,250,240,0.15)] cursor-pointer'}`}>
-                    {hasApplied ? <><CheckCircle2 className="w-3.5 h-3.5" /> Applied</> : <><ArrowRight className="w-3.5 h-3.5" /> Apply</>}
+                  <button
+                    onClick={() => setSelectedJob(job)}
+                    className="flex-1 py-2.5 rounded-xl border border-white/6 hover:border-white/15 text-[10px] font-bold text-white uppercase tracking-wider font-space transition-colors"
+                  >
+                    Details
+                  </button>
+                  <button
+                    onClick={() => handleApplyClick(job)}
+                    disabled={hasApplied}
+                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider font-space flex items-center justify-center gap-1 transition-all ${
+                      hasApplied
+                        ? 'bg-success/15 border border-success/20 text-success'
+                        : 'bg-primaryGlow text-black hover:scale-103 shadow-[0_0_12px_rgba(79,250,240,0.15)] cursor-pointer'
+                    }`}
+                  >
+                    {hasApplied ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Applied
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="w-3.5 h-3.5" /> Apply
+                      </>
+                    )}
                   </button>
                 </div>
               </motion.div>

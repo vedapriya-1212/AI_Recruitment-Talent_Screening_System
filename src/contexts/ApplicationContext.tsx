@@ -23,7 +23,7 @@ interface ApplicationContextType {
   createJob: (job: Omit<JobPost, 'id' | 'created_at' | 'applicationsCount'>) => Promise<JobPost>;
   updateCandidateStatus: (id: string, status: CandidateProfile['status']) => Promise<CandidateProfile>;
   scheduleInterview: (candidateId: string, candidateName: string, jobTitle: string, date: string, time: string, stage: InterviewEvent['stage']) => Promise<InterviewEvent>;
-  applyForJob: (jobId: string) => Promise<void>;
+  applyForJob: (jobId: string, resumeFile: File) => Promise<any>;
   refreshAll: () => Promise<void>;
   refreshMyData: () => Promise<void>;
 }
@@ -47,6 +47,12 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       const apps = await apiClient.getCandidateApplications();
       setMyApplications(apps);
+      
+      const fetchedCandidates = await apiClient.getCandidates();
+      setCandidates(fetchedCandidates);
+
+      const fetchedInterviews = await apiClient.getInterviews();
+      setMyInterviews(fetchedInterviews);
     } catch (err) {
       console.warn('refreshMyData failed:', err);
     }
@@ -172,9 +178,9 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   // ── APPLY FOR JOB (candidate) ─────────────────────────────────────────────
-  const applyForJob = async (jobId: string) => {
+  const applyForJob = async (jobId: string, resumeFile: File) => {
     try {
-      await apiClient.applyForJob(jobId);
+      const response = await apiClient.applyForJob(jobId, resumeFile);
       // Immediately refresh candidate's application list from DB
       const apps = await apiClient.getCandidateApplications();
       setMyApplications(apps);
@@ -185,6 +191,7 @@ export const ApplicationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         )
       );
       addNotification('Application Submitted', 'Your application has been recorded successfully.', 'success');
+      return response;
     } catch (err: any) {
       if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.message?.includes('already applied')) {
         addNotification('Already Applied', 'You have already applied for this position.', 'info');

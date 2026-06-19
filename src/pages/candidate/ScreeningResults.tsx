@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApplication } from '../../contexts/ApplicationContext';
 import { motion } from 'framer-motion';
@@ -7,12 +8,38 @@ import { Brain, CheckCircle, XCircle, Cpu, Award } from 'lucide-react';
 export default function ScreeningResults() {
   const { user } = useAuth();
   const { candidates } = useApplication();
+  const navigate = useNavigate();
 
   const myProfile = candidates.find((c) => c.email.toLowerCase() === user?.email.toLowerCase()) || candidates[0];
 
-  if (!myProfile) return null;
+  if (!myProfile) {
+    return (
+      <div className="p-8 rounded-2xl glass-panel border border-[#FFD166]/30 bg-[#FFD166]/5 flex flex-col items-center justify-center text-center py-20 gap-4">
+        <Brain className="w-12 h-12 text-[#FFD166] animate-pulse" />
+        <h3 className="text-lg font-black uppercase tracking-wider font-space text-white">No AI Screening Report</h3>
+        <p className="text-xs text-mutedGray max-w-md font-outfit leading-relaxed">
+          You will receive a detailed AI feedback report once you upload your resume and apply for a position.
+        </p>
+        <button
+          onClick={() => navigate('/candidate/resume')}
+          className="mt-2 px-5 py-2.5 rounded-xl bg-[#FFD166] text-[#030712] text-xs font-bold uppercase tracking-wider font-space hover:scale-105 transition-all cursor-pointer"
+        >
+          Upload Your Resume
+        </button>
+      </div>
+    );
+  }
 
-  const report = myProfile.screeningReport;
+  const rawReport = myProfile?.screeningReport;
+  const report = {
+    parsedSummary: rawReport?.parsedSummary || 'Screening report processing in progress. Metrics will load once analysis completes.',
+    strengths: Array.isArray(rawReport?.strengths) ? rawReport.strengths : [],
+    weaknesses: Array.isArray(rawReport?.weaknesses) ? rawReport.weaknesses : [],
+    suggestions: Array.isArray(rawReport?.suggestions) ? rawReport.suggestions : [],
+    keywordMatch: rawReport?.keywordMatch ?? 0,
+    technicalFit: rawReport?.technicalFit ?? 0,
+    experienceFit: rawReport?.experienceFit ?? 0,
+  };
 
   return (
     <motion.div

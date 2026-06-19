@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApplication } from '../../contexts/ApplicationContext';
 import { motion } from 'framer-motion';
@@ -18,10 +19,27 @@ const rankHistory = [
 export default function RankingDashboard() {
   const { user } = useAuth();
   const { candidates } = useApplication();
+  const navigate = useNavigate();
 
   const myProfile = candidates.find((c) => c.email.toLowerCase() === user?.email.toLowerCase()) || candidates[0];
 
-  if (!myProfile) return null;
+  if (!myProfile) {
+    return (
+      <div className="p-8 rounded-2xl glass-panel border border-[#FFD166]/30 bg-[#FFD166]/5 flex flex-col items-center justify-center text-center py-20 gap-4">
+        <Trophy className="w-12 h-12 text-[#FFD166] animate-bounce" />
+        <h3 className="text-lg font-black uppercase tracking-wider font-space text-white">No Ranking Diagnostics Yet</h3>
+        <p className="text-xs text-mutedGray max-w-md font-outfit leading-relaxed">
+          Your AI ranking leaderboard will populate once you submit your first application. Go to "Available Jobs" to start your journey.
+        </p>
+        <button
+          onClick={() => navigate('/candidate/jobs')}
+          className="mt-2 px-5 py-2.5 rounded-xl bg-[#FFD166] text-[#030712] text-xs font-bold uppercase tracking-wider font-space hover:scale-105 transition-all cursor-pointer"
+        >
+          Explore Available Jobs
+        </button>
+      </div>
+    );
+  }
 
   // Comparison metrics Candidate vs Average
   const comparisonData = [
@@ -206,7 +224,7 @@ export default function RankingDashboard() {
         <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
           <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Identified Gaps</h4>
           <div className="flex gap-2 flex-wrap">
-            {myProfile.screeningReport.weaknesses.length === 0 ? (
+            {(!myProfile.screeningReport?.weaknesses || myProfile.screeningReport.weaknesses.length === 0) ? (
               <p className="text-xs text-mutedGray font-outfit">No core capability gaps detected.</p>
             ) : (
               myProfile.screeningReport.weaknesses.map((weak, index) => (

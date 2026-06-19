@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LandingPage from '../pages/LandingPage';
 import Unauthorized from '../pages/Unauthorized';
 import { ProtectedRoute } from '../components/ProtectedRoute';
@@ -13,6 +13,7 @@ import ScreeningReport from '../pages/recruiter/ScreeningReport';
 import RankingLeaderboard from '../pages/recruiter/RankingLeaderboard';
 import Scheduler from '../pages/recruiter/Scheduler';
 import Analytics from '../pages/recruiter/Analytics';
+import EmailLogs from '../pages/recruiter/EmailLogs';
 
 // Candidate Pages
 import CandidateDashboard from '../pages/candidate/Dashboard';
@@ -28,6 +29,11 @@ import Notifications from '../pages/candidate/Notifications';
 import InterviewInvitation from '../pages/candidate/InterviewInvitation';
 
 export default function AppRoutes() {
+  const location = useLocation();
+  React.useEffect(() => {
+    console.log(`[Navigation] Transitioned to route path: ${location.pathname}`);
+  }, [location]);
+
   return (
     <Routes>
       {/* Public Routes */}
@@ -101,6 +107,16 @@ export default function AppRoutes() {
           <ProtectedRoute allowedRole="recruiter">
             <DashboardLayout>
               <Analytics />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recruiter/email-logs"
+        element={
+          <ProtectedRoute allowedRole="recruiter">
+            <DashboardLayout>
+              <EmailLogs />
             </DashboardLayout>
           </ProtectedRoute>
         }

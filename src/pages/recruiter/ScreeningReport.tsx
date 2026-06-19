@@ -12,23 +12,10 @@ interface AIReport {
   company: string;
   status: string;
   matchScore: number;
-  technicalScore: number;
-  communicationScore: number;
-  resumeScore: number;
-  overallScore: number;
-  experienceYears: number;
-  education: string;
-  screeningReport: {
-    parsedSummary: string;
-    strengths: string[];
-    weaknesses: string[];
-    keywordMatch: number;
-    technicalFit: number;
-    experienceFit: number;
-    recommendation: string;
-    confidence: number;
-    suggestions: string[];
-  };
+  matchingSkills: string[];
+  missingSkills: string[];
+  experienceRelevance: string;
+  recommendation: string;
 }
 
 export default function ScreeningReport() {
@@ -67,7 +54,7 @@ export default function ScreeningReport() {
         </div>
         <div className="text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-primaryGlow font-space animate-pulse">Running AI Screening Engine...</p>
-          <p className="text-[10px] text-mutedGray font-outfit mt-2">Analyzing resume semantics and skill alignment</p>
+          <p className="text-[10px] text-mutedGray font-outfit mt-2">Analyzing resume semantics and job description fit</p>
         </div>
       </div>
     );
@@ -88,7 +75,8 @@ export default function ScreeningReport() {
     );
   }
 
-  const r = report.screeningReport;
+  const matchingSkills = report.matchingSkills || [];
+  const missingSkills = report.missingSkills || [];
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-10 text-left">
@@ -102,142 +90,103 @@ export default function ScreeningReport() {
             <ArrowLeft className="w-4.5 h-4.5" />
           </button>
           <div>
-            <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">AI Screening Report</h2>
+            <h2 className="text-3xl font-black font-space tracking-tight text-white uppercase">Recruiter Match Report</h2>
             <p className="text-mutedGray text-xs font-outfit mt-1">
-              Deep semantic evaluation for <span className="text-white font-bold">{report.candidateName}</span> → {report.jobTitle}
+              Job Description Semantic Evaluation for <span className="text-white font-bold">{report.candidateName}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Status badge */}
           <span className="text-[9px] border px-2.5 py-1 rounded font-black uppercase tracking-wider font-space border-primaryGlow/30 bg-primaryGlow/10 text-primaryGlow">
             {report.status}
           </span>
-          {/* Confidence pill */}
-          <div className="p-4 rounded-xl bg-white/2 border border-white/5 flex items-center gap-3">
-            <Cpu className="w-5 h-5 text-primaryGlow" />
-            <div>
-              <span className="text-base font-black text-white font-space block">{r.confidence}%</span>
-              <span className="text-[8px] text-mutedGray uppercase font-black tracking-widest font-space">AI Confidence</span>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Score cards row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'AI Match', value: report.matchScore, color: 'text-primaryGlow', bg: 'bg-primaryGlow/10 border-primaryGlow/20' },
-          { label: 'Technical', value: report.technicalScore, color: 'text-secondaryGlow', bg: 'bg-secondaryGlow/10 border-secondaryGlow/20' },
-          { label: 'Communication', value: report.communicationScore, color: 'text-[#FFD166]', bg: 'bg-[#FFD166]/10 border-[#FFD166]/20' },
-          { label: 'Overall', value: report.overallScore, color: 'text-success', bg: 'bg-success/10 border-success/20' },
-        ].map((s) => (
-          <div key={s.label} className={`p-4 rounded-2xl glass-panel border ${s.bg} text-center`}>
-            <div className={`text-3xl font-black font-space ${s.color}`}>{s.value}%</div>
-            <div className="text-[9px] text-mutedGray uppercase tracking-wider font-space mt-1">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* LEFT COLUMN */}
+        
+        {/* LEFT COLUMN: Match Details */}
         <div className="lg:col-span-8 space-y-8">
-          {/* AI Summary */}
-          <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider font-space flex items-center gap-2">
-              <Brain className="w-4 h-4 text-primaryGlow animate-pulse" /> Semantic Parser Summary
-            </h4>
-            <p className="text-xs text-mutedGray leading-relaxed font-outfit">{r.parsedSummary}</p>
+          
+          {/* Match Score Display */}
+          <div className="p-8 rounded-2xl glass-panel border border-primaryGlow/20 bg-gradient-to-br from-primaryGlow/5 via-[#071021]/30 to-[#071021]/40 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="space-y-2 text-center sm:text-left">
+              <span className="text-[9px] text-mutedGray uppercase tracking-widest font-space font-bold">Neural Matching Score</span>
+              <h3 className="text-5xl font-black text-white font-space">{report.matchScore}%</h3>
+              <p className="text-[11px] text-mutedGray font-outfit max-w-sm">
+                Semantic model mapping of candidate profile vs job description requirements.
+              </p>
+            </div>
+            <div className="w-24 h-24 rounded-full border-4 border-dashed border-primaryGlow/20 flex items-center justify-center p-2">
+              <div className="w-full h-full rounded-full bg-primaryGlow/10 flex items-center justify-center">
+                <Brain className="w-10 h-10 text-primaryGlow animate-pulse" />
+              </div>
+            </div>
           </div>
 
-          {/* Strengths & Weaknesses */}
+          {/* Matching & Missing Skills */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            
             <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
               <h4 className="text-xs font-black text-success uppercase tracking-wider font-space flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-success" /> Key Strengths
+                <CheckCircle className="w-4 h-4 text-success" /> Matching Skills
               </h4>
-              <ul className="space-y-3">
-                {r.strengths.map((str, i) => (
-                  <li key={i} className="flex gap-2.5 items-start text-xs text-mutedGray font-outfit leading-relaxed">
-                    <CheckCircle className="w-4 h-4 text-success shrink-0 mt-0.5" />
-                    <span>{str}</span>
-                  </li>
-                ))}
-              </ul>
+              {matchingSkills.length === 0 ? (
+                <p className="text-xs text-mutedGray font-outfit">No explicit skill match found in resume.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {matchingSkills.map((skill, i) => (
+                    <span key={i} className="text-[9px] font-bold text-success bg-success/10 border border-success/25 px-2.5 py-1 rounded-full font-space uppercase">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
               <h4 className="text-xs font-black text-error uppercase tracking-wider font-space flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-error" /> Detected Gaps
+                <XCircle className="w-4 h-4 text-error" /> Missing Skills
               </h4>
-              <ul className="space-y-3">
-                {r.weaknesses.map((weak, i) => (
-                  <li key={i} className="flex gap-2.5 items-start text-xs text-mutedGray font-outfit leading-relaxed">
-                    <XCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
-                    <span>{weak}</span>
-                  </li>
-                ))}
-              </ul>
+              {missingSkills.length === 0 ? (
+                <p className="text-xs text-mutedGray font-outfit">No missing critical skills detected.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {missingSkills.map((skill, i) => (
+                    <span key={i} className="text-[9px] font-bold text-error bg-error/10 border border-error/25 px-2.5 py-1 rounded-full font-space uppercase">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
+
           </div>
 
-          {/* Suggestions */}
+          {/* Experience Relevance */}
           <div className="p-6.5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-4">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Recruiter Action Items</h4>
-            <ul className="space-y-3">
-              {r.suggestions.map((sug, i) => (
-                <li key={i} className="flex gap-2.5 items-start text-xs text-mutedGray font-outfit leading-relaxed">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primaryGlow shrink-0 mt-1.5" />
-                  <span>{sug}</span>
-                </li>
-              ))}
-            </ul>
+            <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Experience Relevance</h4>
+            <p className="text-xs text-mutedGray leading-relaxed font-outfit">{report.experienceRelevance}</p>
           </div>
+
         </div>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT COLUMN: Recruiter Recommendations */}
         <div className="lg:col-span-4 space-y-8">
-          {/* Alignment Diagnostics */}
-          <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-6">
-            <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">Alignment Diagnostics</h4>
-            <div className="space-y-4">
-              {[
-                { label: 'Keyword Match Index', value: r.keywordMatch, color: 'bg-primaryGlow' },
-                { label: 'Technical Capability Fit', value: r.technicalFit, color: 'bg-secondaryGlow' },
-                { label: 'Experience Threshold Fit', value: r.experienceFit, color: 'bg-accentGlow' },
-              ].map((bar) => (
-                <div key={bar.label}>
-                  <div className="flex justify-between text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space mb-1">
-                    <span>{bar.label}</span>
-                    <span>{bar.value}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${bar.value}%` }}
-                      transition={{ duration: 1, delay: 0.3 }}
-                      className={`h-full ${bar.color}`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
+          
           {/* Final Recommendation */}
           <div className="p-6 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-6 text-center relative overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primaryGlow to-secondaryGlow" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primaryGlow to-[#FFD166]" />
             <div className="w-12 h-12 rounded-xl bg-primaryGlow/10 border border-primaryGlow/25 text-primaryGlow flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-6 h-6 animate-pulse" />
             </div>
             <h4 className="text-xs font-black text-white uppercase tracking-wider font-space">AI Recommendation</h4>
             <h3 className="text-base font-black text-primaryGlow font-space uppercase leading-snug tracking-wide mt-2">
-              {r.recommendation}
+              {report.recommendation}
             </h3>
-            <p className="text-[11px] text-mutedGray font-outfit mt-4 leading-relaxed">
-              Neural matching models indicate <span className="text-white font-bold">{report.candidateName}</span> has a {r.confidence}% confidence alignment for this role.
-            </p>
+            
             <button
               onClick={() => navigate('/recruiter/scheduler')}
               className="w-full py-3.5 mt-6 rounded-xl bg-primaryGlow text-[#030712] font-bold text-xs uppercase tracking-widest font-space hover:scale-103 transition-all cursor-pointer"
@@ -246,9 +195,9 @@ export default function ScreeningReport() {
             </button>
           </div>
 
-          {/* Candidate Info */}
+          {/* Candidate Info card */}
           <div className="p-5 rounded-2xl glass-panel border border-white/6 bg-[#071021]/30 space-y-3">
-            <h4 className="text-[10px] font-black text-mutedGray uppercase tracking-wider font-space">Candidate Info</h4>
+            <h4 className="text-[10px] font-black text-mutedGray uppercase tracking-wider font-space">Candidate Metadata</h4>
             <div className="space-y-2 text-xs font-outfit">
               <div className="flex justify-between">
                 <span className="text-mutedGray">Name</span>
@@ -256,19 +205,17 @@ export default function ScreeningReport() {
               </div>
               <div className="flex justify-between">
                 <span className="text-mutedGray">Email</span>
-                <span className="text-white text-[10px]">{report.candidateEmail}</span>
+                <span className="text-white text-[10px] select-all">{report.candidateEmail}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-mutedGray">Experience</span>
-                <span className="text-white font-bold">{report.experienceYears} Years</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-mutedGray">Education</span>
-                <span className="text-white text-[10px] text-right max-w-[140px]">{report.education}</span>
+                <span className="text-mutedGray">Target Role</span>
+                <span className="text-white font-bold">{report.jobTitle}</span>
               </div>
             </div>
           </div>
+
         </div>
+
       </div>
     </motion.div>
   );

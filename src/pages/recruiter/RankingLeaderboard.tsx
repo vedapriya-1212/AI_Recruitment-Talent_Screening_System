@@ -127,9 +127,7 @@ export default function RankingLeaderboard() {
                 <th className="py-3 px-4">Candidate</th>
                 <th className="py-3 px-4">AI Match</th>
                 <th className="py-3 px-4 text-center">Exp</th>
-                <th className="py-3 px-4 text-center">Resume</th>
-                <th className="py-3 px-4 text-center">Technical</th>
-                <th className="py-3 px-4 text-center">Overall Index</th>
+                <th className="py-3 px-4 text-center">AI Recommendation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4 text-xs font-outfit text-mutedGray">
@@ -164,17 +162,9 @@ export default function RankingLeaderboard() {
                   <td className="py-4 px-4 text-center">
                     {cand.experienceYears} yrs
                   </td>
-                  {/* Resume Score */}
-                  <td className="py-4 px-4 text-center">
-                    {cand.resumeScore}%
-                  </td>
-                  {/* Tech Score */}
-                  <td className="py-4 px-4 text-center font-bold text-white">
-                    {cand.technicalScore}%
-                  </td>
-                  {/* Overall Index */}
-                  <td className="py-4 px-4 text-center font-black text-primaryGlow font-space">
-                    {cand.overallScore}%
+                  {/* AI Recommendation */}
+                  <td className="py-4 px-4 text-center font-bold text-[#FFD166] font-space uppercase">
+                    {cand.screeningReport?.recommendation || 'Proceed to Review'}
                   </td>
                 </tr>
               ))}

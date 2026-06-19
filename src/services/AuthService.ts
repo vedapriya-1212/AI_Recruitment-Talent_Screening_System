@@ -80,13 +80,14 @@ class AuthService {
     password_hash: string,
     first_name: string,
     last_name: string,
-    role: 'candidate' | 'recruiter'
-  ): Promise<UserProfile> {
+    role: 'candidate' | 'recruiter',
+    otp?: string
+  ): Promise<any> {
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: password_hash, first_name, last_name, role })
+        body: JSON.stringify({ email, password: password_hash, first_name, last_name, role, otp })
       });
 
       if (!res.ok) {
@@ -97,6 +98,10 @@ class AuthService {
       }
 
       const result = await res.json();
+      if (result.otpRequired) {
+        return result; // returns { otpRequired: true, message: '...' }
+      }
+      
       const { token, user, emailConfirmationRequired } = result;
       
       // Store token if we have one; otherwise use a special marker
@@ -117,6 +122,7 @@ class AuthService {
       }
 
       console.warn('API signup connection failed, running demo fallback:', err);
+      // For local fallback, complete signup directly
       const userProfile: UserProfile = {
         id: `mock-${role}-${Math.random().toString(36).substr(2, 9)}`,
         email,
@@ -128,6 +134,19 @@ class AuthService {
       localStorage.setItem('demo_user_session', JSON.stringify(userProfile));
       return userProfile;
     }
+  }
+
+  async resendOtp(email: string): Promise<any> {
+    const res = await fetch('/api/auth/resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to resend verification code.');
+    }
+    return await res.json();
   }
 
   async logout(): Promise<void> {
