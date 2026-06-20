@@ -110,7 +110,7 @@ export default function FuturisticBackground({ children }) {
   }, []);
 
   return (
-    <div className="relative min-h-screen w-full bg-bgDark overflow-hidden">
+    <div className="relative min-h-screen w-full bg-bgDark">
       {/* LAYER 1: Dark cosmic gradient base */}
       <div className="absolute inset-0 bg-[#030712] z-0" />
 
@@ -137,7 +137,7 @@ export default function FuturisticBackground({ children }) {
       />
 
       {/* Content Layer */}
-      <div className="relative z-10 w-full min-h-screen">
+      <div className="relative z-10 w-full">
         {children}
       </div>
 

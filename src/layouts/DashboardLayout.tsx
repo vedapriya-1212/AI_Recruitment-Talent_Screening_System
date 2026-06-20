@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Cpu, LayoutDashboard, PlusCircle, Users, Trophy, 
   Calendar, BarChart3, UserCheck, Activity, LogOut, Bell, X, Menu,
-  Briefcase, ClipboardList, Percent, Mail
+  Briefcase, ClipboardList, Percent, Mail, Video
 } from 'lucide-react';
 import CandidateChatbot from '../components/CandidateChatbot';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -55,6 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: 'Overview',    path: '/recruiter/dashboard',  icon: LayoutDashboard },
     { label: 'Create Job',  path: '/recruiter/create-job', icon: PlusCircle },
     { label: 'Applications',path: '/recruiter/applications',icon: Users },
+    { label: 'Interview Center', path: '/recruiter/interviews', icon: Video },
     { label: 'Rankings',    path: '/recruiter/rankings',   icon: Trophy },
     { label: 'Scheduler',   path: '/recruiter/scheduler',  icon: Calendar },
     { label: 'Analytics',   path: '/recruiter/analytics',  icon: BarChart3 },
@@ -65,6 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: 'Dashboard', path: '/candidate/dashboard', icon: LayoutDashboard },
     { label: 'Available Jobs', path: '/candidate/jobs', icon: Briefcase },
     { label: 'My Applications', path: '/candidate/applications', icon: ClipboardList },
+    { label: 'My Interviews', path: '/candidate/interviews', icon: Video },
     { label: 'Resume Analysis', path: '/candidate/resume', icon: Cpu },
     { label: 'Match Scores', path: '/candidate/match', icon: Percent },
     { label: 'Ranking Status', path: '/candidate/rankings', icon: Trophy },
@@ -75,8 +77,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const items = role === 'recruiter' ? recruiterItems : candidateItems;
 
   return (
-    <div className="h-screen bg-[#030712] text-white flex flex-col lg:flex-row relative overflow-hidden">
+    <div className="h-screen h-[100dvh] bg-[#030712] text-white flex flex-col lg:flex-row relative overflow-hidden">
       
+      {/* Mobile Sidebar Backdrop Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden fixed inset-0 bg-black z-30 cursor-pointer backdrop-blur-sm"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Top Mobile Nav Bar */}
       <header className="lg:hidden w-full px-6 py-4 flex items-center justify-between glass-panel border-b border-white/6 z-30 bg-[#071021]/90 backdrop-blur-md sticky top-0">
         <div className="flex items-center gap-2">
@@ -100,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar Navigation */}
       <aside className={`
         fixed inset-y-0 left-0 w-64 z-40 bg-[#071021]/90 backdrop-blur-md border-r border-white/6 p-6 flex flex-col justify-between
-        transform lg:translate-x-0 lg:static lg:h-screen transition-transform duration-300 ease-in-out
+        transform lg:translate-x-0 lg:static lg:h-screen lg:h-[100dvh] transition-transform duration-300 ease-in-out
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col gap-8">

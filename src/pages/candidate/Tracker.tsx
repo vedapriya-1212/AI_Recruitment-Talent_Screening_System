@@ -56,11 +56,14 @@ export default function Tracker() {
           <h3 className="text-xl font-black text-white font-space mt-2.5 uppercase tracking-wide">{myProfile.jobTitle}</h3>
         </div>
 
-        {/* Horizontal Pipeline Steps */}
+        {/* Horizontal/Vertical Pipeline Steps */}
         <div className="relative flex flex-col md:flex-row justify-between items-center gap-8 md:gap-4 md:px-10">
           
-          {/* Timeline background connection line */}
+          {/* Timeline background connection line (desktop/tablet) */}
           <div className="hidden md:block absolute top-[16px] left-[10%] right-[10%] h-[2px] bg-white/5 z-0" />
+
+          {/* Timeline background connection line (mobile) */}
+          <div className="block md:hidden absolute left-1/2 top-[18px] bottom-[18px] w-[2px] bg-white/5 z-0 -translate-x-1/2" />
 
           {phases.map((phase, idx) => {
             const isCompleted = idx < currentIdx || myProfile.status === 'Selected';

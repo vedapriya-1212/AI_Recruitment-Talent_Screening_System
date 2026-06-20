@@ -159,14 +159,9 @@ export default function InterviewInvitation() {
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-mutedGray uppercase tracking-wider font-space block">Meeting Channel</span>
-                      <a
-                        href="https://meet.google.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primaryGlow hover:underline font-bold font-mono"
-                      >
-                        Google Meet (link sent via email)
-                      </a>
+                      <span className="text-sm text-primaryGlow font-bold font-mono">
+                        AI Interview Portal
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -201,13 +196,22 @@ export default function InterviewInvitation() {
                         Change Response
                       </button>
                       {displayStatus === 'Accepted' && (
-                        <button
-                          onClick={() => handleAddToCalendar(iv.jobTitle, iv.date, iv.time)}
-                          className="flex-grow py-3.5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/15 text-white rounded-xl text-xs font-bold uppercase tracking-wider font-space flex items-center justify-center gap-2 cursor-pointer transition-all"
-                        >
-                          <CalendarPlus className="w-4.5 h-4.5 text-primaryGlow" />
-                          <span>Synchronize to Calendar</span>
-                        </button>
+                        <div className="flex-grow flex gap-4">
+                          <button
+                            onClick={() => handleAddToCalendar(iv.jobTitle, iv.date, iv.time)}
+                            className="flex-1 py-3.5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/15 text-white rounded-xl text-xs font-bold uppercase tracking-wider font-space flex items-center justify-center gap-2 cursor-pointer transition-all"
+                          >
+                            <CalendarPlus className="w-4.5 h-4.5 text-primaryGlow" />
+                            <span>Calendar</span>
+                          </button>
+                          <button
+                            onClick={() => navigate(`/candidate/interview-room/${iv.id}`)}
+                            className="flex-1 py-3.5 bg-secondaryGlow text-[#030712] rounded-xl text-xs font-bold uppercase tracking-wider font-space flex items-center justify-center gap-2 cursor-pointer hover:bg-[#ff8adb] transition-all shadow-[0_0_15px_rgba(255,94,181,0.2)]"
+                          >
+                            <Video className="w-4.5 h-4.5" />
+                            <span>Start AI Interview</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}

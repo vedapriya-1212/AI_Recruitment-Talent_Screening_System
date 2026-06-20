@@ -126,20 +126,9 @@ export const apiClient = {
       const candidate = await this.getCandidate(id);
       if (!candidate) throw new Error('Candidate not found');
       return { ...candidate, status };
-    } catch (err) {
-      console.warn('API updateCandidateStatus failed. Writing to local cache:', err);
-      const candidates = await this.getCandidates();
-      let updatedCandidate: CandidateProfile | null = null;
-      const updatedList = candidates.map((c) => {
-        if (c.id === id) {
-          updatedCandidate = { ...c, status };
-          return updatedCandidate;
-        }
-        return c;
-      });
-      if (!updatedCandidate) throw new Error('Candidate not found');
-      localStorage.setItem('ats_candidates', JSON.stringify(updatedList));
-      return updatedCandidate;
+    } catch (err: any) {
+      console.warn('API updateCandidateStatus failed:', err);
+      throw err;
     }
   },
 
@@ -281,15 +270,9 @@ export const apiClient = {
         throw new Error(errorData.error || 'Failed to apply for job');
       }
       return await res.json();
-    } catch (err) {
-      console.warn('API applyForJob failed. Writing to local cache:', err);
-      const saved = localStorage.getItem('applied_jobs_list');
-      const list = saved ? JSON.parse(saved) : [];
-      if (!list.includes(jobId)) {
-        list.push(jobId);
-        localStorage.setItem('applied_jobs_list', JSON.stringify(list));
-      }
-      return { job_id: jobId, candidate_id: 'local-candidate', status: 'Applied' };
+    } catch (err: any) {
+      console.warn('API applyForJob failed:', err);
+      throw err;
     }
   },
 
@@ -609,20 +592,8 @@ export const apiClient = {
       localStorage.setItem('mock_latest_analysis', JSON.stringify(data));
       return data;
     } catch (err: any) {
-      console.warn('API analyzeResumeSelf failed. Generating local mock fallback:', err);
-      const mockResult = {
-        success: true,
-        analysis: {
-          analysis_id: `anal-mock-${Date.now()}`,
-          resume_score: 82,
-          ats_score: 88,
-          strengths: ['Java', 'Python', 'SQL'],
-          missing_skills: ['Docker', 'Kubernetes'],
-          suggestions: ['Add project descriptions', 'Quantify achievements']
-        }
-      };
-      localStorage.setItem('mock_latest_analysis', JSON.stringify(mockResult));
-      return mockResult;
+      console.warn('API analyzeResumeSelf failed:', err);
+      throw err;
     }
   },
 

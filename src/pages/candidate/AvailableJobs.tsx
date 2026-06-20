@@ -79,7 +79,7 @@ export default function AvailableJobs() {
       if (selectedJob?.id === job.id) setSelectedJob(null);
     } catch (err: any) {
       if (!err?.message?.includes('duplicate') && !err?.message?.includes('unique')) {
-        toast.error('Failed to submit application. Please try again.');
+        toast.error(err.message || 'Failed to submit application. Please try again.');
       }
     } finally {
       setApplyingId(null);
@@ -491,7 +491,7 @@ export default function AvailableJobs() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedJob(null)} className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 220 }} className="fixed top-0 right-0 h-full w-full max-w-lg z-50 bg-[#071021] border-l border-white/10 p-6 md:p-10 flex flex-col justify-between text-left shadow-2xl">
-              <div className="space-y-8 overflow-y-auto max-h-[85vh] pr-2 scrollbar-thin">
+              <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin space-y-8 mb-6">
                 <div className="flex justify-between items-center border-b border-white/5 pb-5">
                   <div className="flex items-center gap-2 text-primaryGlow">
                     <Sparkles className="w-4 h-4 animate-pulse" />

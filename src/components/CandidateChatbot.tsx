@@ -128,7 +128,7 @@ export default function CandidateChatbot() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10" style={{ maxHeight: '340px' }}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${msg.role === 'assistant' ? 'bg-primaryGlow/15 border border-primaryGlow/25 text-primaryGlow' : 'bg-secondaryGlow/15 border border-secondaryGlow/25 text-secondaryGlow'}`}>

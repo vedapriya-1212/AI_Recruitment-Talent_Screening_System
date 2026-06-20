@@ -397,7 +397,7 @@ export default function ResumeUpload() {
                   {selfAnalysis ? (
                     <div className="space-y-6">
                       {/* Scores display */}
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="p-5 rounded-xl bg-white/2 border border-white/5 text-center flex flex-col items-center justify-center">
                           <span className="text-[9px] text-mutedGray uppercase tracking-wider font-space">Resume Score</span>
                           <span className="text-3xl font-black text-white font-space mt-2">{resumeScore}/100</span>

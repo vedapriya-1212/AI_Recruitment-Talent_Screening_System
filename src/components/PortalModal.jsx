@@ -174,7 +174,7 @@ export default function PortalModal({ isOpen, onClose }) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.93, y: 20 }}
             transition={{ type: 'spring', duration: 0.5 }}
-            className="relative z-10 w-full max-w-4xl glass-panel rounded-2xl overflow-hidden p-6 md:p-10 border border-white/10 shadow-2xl bg-[#071021]/80"
+            className="relative z-10 w-full max-w-4xl glass-panel rounded-2xl max-h-[90vh] overflow-y-auto p-6 md:p-10 border border-white/10 shadow-2xl bg-[#071021]/80"
           >
             {/* Close Button */}
             <button

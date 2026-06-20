@@ -337,7 +337,7 @@ async function generateAppResumeSummary(resumeText, filename) {
   if (apiKey) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const prompt = `Based on this resume text, generate a short bulleted summary containing 3 to 5 key highlights (such as years of experience in frameworks, main skills, or project domains).
       Return ONLY a list of bullet points starting with '* ' or '- ' (one per line, no introductory text, no JSON, just raw text):
 
@@ -380,12 +380,13 @@ router.post('/:jobId', requireAuth, upload.single('resume'), async (req, res) =>
 
     // Extract PDF text
     try {
-      const pdfParse = require('pdf-parse');
-      const parsed = await pdfParse(req.file.buffer);
-      resumeText = parsed.text || '';
+      const { extractTextFromPDF } = require('../services/pdfParser.cjs');
+      const parsed = await extractTextFromPDF(req.file.buffer);
+      resumeText = parsed.text;
+      console.log(`[App Apply] Extracted ${resumeText.length} chars from ${parsed.pages} pages`);
     } catch (pdfErr) {
-      console.warn('[App Apply] pdf-parse failed, decoding buffer:', pdfErr.message);
-      resumeText = req.file.buffer.toString('utf8', 0, Math.min(req.file.buffer.length, 5000));
+      console.warn('[App Apply] PDF Extraction Failed:', pdfErr.message);
+      return res.status(500).json({ error: 'Unable to extract text from PDF. Ensure the file is not corrupted or image-only.' });
     }
 
     // Check for duplicate application first
@@ -433,55 +434,28 @@ router.post('/:jobId', requireAuth, upload.single('resume'), async (req, res) =>
     const { extractSkillsFromResume } = require('../services/gemini.cjs');
     
     let resumeInfo = { years: 2, education: 'B.Tech in Computer Science', skills: [] };
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const prompt = `Analyze this resume and extract the following details:
-        - Total years of professional experience as an integer.
-        - Highest education qualification (degree and major).
-        - List of key technical skills, programming languages, and tools mentioned.
-        
-        Return ONLY a valid JSON object with the following structure (no markdown, no formatting, just raw JSON):
-        {
-          "years": <number>,
-          "education": "<string>",
-          "skills": ["<skill1>", "<skill2>", ...]
-        }
-        
-        Resume Text:
-        ${resumeText.slice(0, 3000)}`;
-        
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim()
-          .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-        const parsed = JSON.parse(text);
-        if (parsed) {
-          resumeInfo = {
-            years: typeof parsed.years === 'number' ? parsed.years : parseInt(parsed.years) || 2,
-            education: parsed.education || 'B.Tech in Computer Science',
-            skills: Array.isArray(parsed.skills) ? parsed.skills : []
-          };
-        }
-      } catch (e) {
-        console.warn('[Applications API] Quick resume info extraction failed:', e.message);
+    const { extractResumeInfo } = require('../services/gemini.cjs');
+    
+    try {
+      const parsed = await extractResumeInfo(resumeText);
+      if (parsed) {
+        resumeInfo = {
+          years: typeof parsed.years === 'number' ? parsed.years : parseInt(parsed.years) || 2,
+          education: parsed.education || 'B.Tech in Computer Science',
+          skills: Array.isArray(parsed.skills) ? parsed.skills : []
+        };
       }
+    } catch (e) {
+      console.warn('[Applications API] Quick resume info extraction failed:', e.message);
+      // We don't throw here to allow fallback skills extraction if possible
     }
 
     if (!resumeInfo.skills || !resumeInfo.skills.length) {
       try {
         const fallbackSkills = await extractSkillsFromResume(resumeText);
         resumeInfo.skills = fallbackSkills;
-      } catch {
-        // Safe inline mock extract
-        const commonSkills = ['React', 'TypeScript', 'JavaScript', 'Node.js', 'Python', 'SQL', 'AWS', 'Docker', 'Kubernetes'];
-        const found = [];
-        const lowerText = (resumeText || '').toLowerCase();
-        for (const skill of commonSkills) {
-          if (lowerText.includes(skill.toLowerCase())) found.push(skill);
-        }
-        resumeInfo.skills = found.length > 0 ? found : ['Software Development'];
+      } catch (e) {
+        throw new Error('Resume Analysis Failed: Unable to connect to Gemini AI (skills extraction).');
       }
     }
 
@@ -500,14 +474,11 @@ router.post('/:jobId', requireAuth, upload.single('resume'), async (req, res) =>
         requirements: jobData.requirements
       });
     } catch (aiErr) {
-      console.warn('[App Apply] analyzeJobMatch failed, using fallback:', aiErr.message);
-      matchResult = {
-        matchScore: 75,
-        matchingSkills: ['Python', 'SQL'],
-        missingSkills: ['AWS'],
-        experienceRelevance: 'Moderate alignment with requirements',
-        recommendation: 'Good Match'
-      };
+      console.warn('[App Apply] analyzeJobMatch failed:', aiErr.message);
+      const msg = aiErr.message.includes('high demand') 
+        ? 'AI Analysis temporarily unavailable due to high demand. Please try again in a few minutes.' 
+        : 'Resume Analysis Failed: Unable to connect to Gemini AI.';
+      throw new Error(msg);
     }
 
     // Construct serialized resume_url containing all details
@@ -685,6 +656,7 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
       applicationsCache.set(req.params.id, existing);
     }
 
+    let finalData = data;
     if (!data || data.length === 0) {
       console.log('[Status PATCH] No rows updated by ID, trying candidate_id fallback...');
       const { data: data2, error: err2 } = await supabase
@@ -693,7 +665,10 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
         .eq('candidate_id', req.params.id)
         .select();
       if (err2) throw err2;
-      return res.json({ success: true, updated: data2 });
+      finalData = data2;
+      if (!finalData || finalData.length === 0) {
+         return res.json({ success: true, updated: [] });
+      }
     }
 
     // ── Step 3: Email notification logic ─────────────────────────────────
@@ -770,14 +745,16 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
           console.log(`[Email] 📧 SENDING "${dbStatus}" email → ${candidateEmail}`);
           console.log(`[Email]    Candidate: ${candidateName} | Job: ${jobTitle} | Company: ${company}`);
 
-          sendStatusEmail({
-            to:            candidateEmail,
-            status:        dbStatus,
-            candidateName,
-            jobTitle,
-            company,
-          }).then(async () => {
+          try {
+            await sendStatusEmail({
+              to:            candidateEmail,
+              status:        dbStatus,
+              candidateName,
+              jobTitle,
+              company,
+            });
             console.log(`[Email] ✅ Email SENT for "${dbStatus}" to ${candidateEmail}`);
+            
             // Update last_notified_status
             try {
               await supabase
@@ -791,9 +768,10 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
             if (applicationsCache.has(req.params.id)) {
               applicationsCache.get(req.params.id).last_notified_status = dbStatus;
             }
-          }).catch(e => {
+          } catch (e) {
             console.error(`[Email] ❌ FAILED after retries for "${dbStatus}" to ${candidateEmail}: ${e.message}`);
-          });
+            throw new Error(`Email Delivery Failed: ${e.message}`);
+          }
         } else {
           console.warn(`[Email] ❌ Cannot send "${dbStatus}" — no valid email. Got: "${candidateEmail}" for app ${req.params.id}`);
         }
@@ -803,7 +781,7 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
     }
 
     console.log(`[Status PATCH] ═══════════════════════════════════════════════════\n`);
-    return res.json({ success: true, updated: data });
+    return res.json({ success: true, updated: finalData });
   } catch (err) {
     console.error(`[Status PATCH] ❌ ERROR: ${err.message}`);
     return res.status(500).json({ error: err.message });

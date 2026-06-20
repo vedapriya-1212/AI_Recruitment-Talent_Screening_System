@@ -226,7 +226,7 @@ export default function EmailLogs() {
         </div>
 
         {smtpStatus ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[375px]:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Mode */}
             <div className="p-3 rounded-xl bg-white/3 border border-white/5">
               <p className="text-[9px] text-mutedGray uppercase tracking-wider font-space mb-1">Mode</p>
@@ -300,7 +300,7 @@ export default function EmailLogs() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[375px]:grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Total Logged',    value: logs.length,   color: 'text-white',         dot: 'bg-white/50' },
           { label: 'Delivered (Real)',value: totalReal,      color: 'text-emerald-400',   dot: 'bg-emerald-400' },

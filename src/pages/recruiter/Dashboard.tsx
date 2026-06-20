@@ -81,7 +81,7 @@ export default function RecruiterDashboard() {
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Open Requirements', value: totalJobs, icon: FileText, color: 'primaryGlow', glow: 'border-primaryGlow/25 hover:border-primaryGlow/40' },
           { label: 'Active Candidates', value: activeCandidates, icon: Users, color: 'secondaryGlow', glow: 'border-secondaryGlow/25 hover:border-secondaryGlow/40' },
@@ -212,11 +212,11 @@ export default function RecruiterDashboard() {
             <div className="p-4 rounded-2xl glass-panel bg-white/2 border border-white/5 flex flex-col gap-3">
               {interviews.slice(0, 3).map((meet) => (
                 <div key={meet.id} className="p-3 rounded-xl bg-white/2 border border-white/4 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-white">{meet.candidateName}</span>
-                    <span className="text-[8px] bg-primaryGlow/10 text-primaryGlow border border-primaryGlow/25 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{meet.stage}</span>
+                  <div className="flex justify-between items-center gap-2 min-w-0">
+                    <span className="text-xs font-bold text-white truncate">{meet.candidateName}</span>
+                    <span className="text-[8px] bg-primaryGlow/10 text-primaryGlow border border-primaryGlow/25 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0">{meet.stage}</span>
                   </div>
-                  <span className="text-[9px] text-mutedGray block">{meet.jobTitle}</span>
+                  <span className="text-[9px] text-mutedGray block truncate">{meet.jobTitle}</span>
                   <span className="text-[9px] text-primaryGlow block font-space">{meet.date} @ {meet.time}</span>
                 </div>
               ))}

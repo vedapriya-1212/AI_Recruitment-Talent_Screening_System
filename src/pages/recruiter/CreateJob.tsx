@@ -176,7 +176,7 @@ export default function CreateJob() {
                 </div>
 
                 {/* Grid Row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Department</label>
                     <select
@@ -203,7 +203,7 @@ export default function CreateJob() {
                 </div>
 
                 {/* Salary Benchmark */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-mutedGray mb-1.5 font-space">Salary Floor ($)</label>
                     <input

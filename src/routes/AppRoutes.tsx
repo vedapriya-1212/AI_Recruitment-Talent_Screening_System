@@ -14,6 +14,7 @@ import RankingLeaderboard from '../pages/recruiter/RankingLeaderboard';
 import Scheduler from '../pages/recruiter/Scheduler';
 import Analytics from '../pages/recruiter/Analytics';
 import EmailLogs from '../pages/recruiter/EmailLogs';
+import InterviewCenter from '../pages/recruiter/InterviewCenter';
 
 // Candidate Pages
 import CandidateDashboard from '../pages/candidate/Dashboard';
@@ -27,6 +28,7 @@ import ResumeUpload from '../pages/candidate/ResumeUpload';
 import MatchScores from '../pages/candidate/MatchScores';
 import Notifications from '../pages/candidate/Notifications';
 import InterviewInvitation from '../pages/candidate/InterviewInvitation';
+import InterviewRoom from '../pages/candidate/InterviewRoom';
 
 export default function AppRoutes() {
   const location = useLocation();
@@ -117,6 +119,16 @@ export default function AppRoutes() {
           <ProtectedRoute allowedRole="recruiter">
             <DashboardLayout>
               <EmailLogs />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recruiter/interviews"
+        element={
+          <ProtectedRoute allowedRole="recruiter">
+            <DashboardLayout>
+              <InterviewCenter />
             </DashboardLayout>
           </ProtectedRoute>
         }
@@ -229,6 +241,16 @@ export default function AppRoutes() {
           <ProtectedRoute allowedRole="candidate">
             <DashboardLayout>
               <InterviewInvitation />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/interview-room/:id"
+        element={
+          <ProtectedRoute allowedRole="candidate">
+            <DashboardLayout>
+              <InterviewRoom />
             </DashboardLayout>
           </ProtectedRoute>
         }

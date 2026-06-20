@@ -109,7 +109,7 @@ export default function Hero({ onOpenModal }) {
         <div className="lg:col-span-6 flex justify-center items-center relative h-[500px] sm:h-[600px] w-full mt-12 lg:mt-0 preserve-3d">
           
           {/* Main Visual Core Container */}
-          <div className="relative w-[340px] sm:w-[480px] h-[340px] sm:h-[480px] flex items-center justify-center">
+          <div className="relative w-[280px] min-[380px]:w-[340px] sm:w-[480px] h-[280px] min-[380px]:h-[340px] sm:h-[480px] flex items-center justify-center scale-[0.8] min-[400px]:scale-[0.9] sm:scale-100 transition-all duration-300">
             
             {/* Ambient Purple/Pink Background Glow */}
             <div className="absolute w-[240px] h-[240px] rounded-full bg-secondaryGlow/20 filter blur-[80px] animate-pulse-slow" />

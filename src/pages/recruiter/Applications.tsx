@@ -48,8 +48,8 @@ export default function Applications() {
         nType
       );
       
-    } catch {
-      toast.error('Failed to update status. Please try again.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status. Please try again.');
     } finally {
       setUpdatingId(null);
     }

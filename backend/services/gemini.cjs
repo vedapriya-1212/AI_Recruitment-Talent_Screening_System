@@ -1,14 +1,21 @@
 // ============================================================
 // backend/services/gemini.cjs
-// Real AI screening using Google Gemini 1.5 Flash
-// With built-in local Mock AI fallbacks when API key is missing
+// Real AI screening using Google Gemini 2.5 Flash
 // ============================================================
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL   = 'gemini-2.5-flash';
+const SDK_VERSION    = require('@google/generative-ai/package.json').version;
+
+// ── Startup Diagnostics ─────────────────────────────────────────────────────
+console.log(`[Gemini] ══════════════════════════════════════════════`);
+console.log(`[Gemini] SDK Version : @google/generative-ai@${SDK_VERSION}`);
+console.log(`[Gemini] Model       : ${GEMINI_MODEL}`);
+console.log(`[Gemini] API Key     : ${GEMINI_API_KEY ? 'LOADED ✅ (' + GEMINI_API_KEY.slice(0, 8) + '...)' : 'MISSING ❌'}`);
+console.log(`[Gemini] ══════════════════════════════════════════════`);
 
 let genAI = null;
-let model = null;
 
 function getModel() {
   if (!GEMINI_API_KEY) {
@@ -17,8 +24,7 @@ function getModel() {
   if (!genAI) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   }
-  // Try loading gemini-1.5-flash which is standard and universally available
-  return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  return genAI.getGenerativeModel({ model: GEMINI_MODEL });
 }
 
 // ── LOCAL MOCK AI FALLBACK ENGINE ──────────────────────────────────────────
@@ -346,6 +352,80 @@ function localAnswerCandidateQuestion({ question, candidateName, resumeSummary, 
 }
 
 
+// ── RESILIENCE WRAPPER ──────────────────────────────────────────────────────
+
+async function executeWithRetry(prompt) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is missing. Production analysis cannot proceed.');
+  }
+
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 15000;
+  
+  // Primary and fallback models
+  const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest'];
+  let currentModelIndex = 0;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const modelName = models[currentModelIndex];
+    const startTime = performance.now();
+    
+    try {
+      if (!genAI) {
+        genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      }
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // Create a timeout promise to race against the Gemini call
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT_ERROR: Gemini request took too long')), TIMEOUT_MS);
+      });
+
+      // Execute Gemini call
+      const generatePromise = model.generateContent(prompt);
+      
+      const result = await Promise.race([generatePromise, timeoutPromise]);
+      const duration = Math.round(performance.now() - startTime);
+      
+      console.log(`[Gemini] model: ${modelName} | prompt length: ${prompt.length} | duration: ${duration}ms | attempts: ${attempt}`);
+      
+      return result.response.text().trim();
+
+    } catch (err) {
+      const duration = Math.round(performance.now() - startTime);
+      const isRateLimit = err.status === 429 || (err.message && err.message.includes('429')) || (err.message && err.message.includes('Too Many Requests'));
+      const isOverload = err.status === 503 || (err.message && err.message.includes('503')) || (err.message && err.message.includes('overloaded')) || (err.message && err.message.includes('Service Unavailable'));
+      const isTimeout = err.message && err.message.includes('TIMEOUT_ERROR');
+      const isNetworkError = err.message && (err.message.includes('fetch failed') || err.message.includes('ECONNRESET') || err.message.includes('ETIMEDOUT'));
+
+      console.warn(`[Gemini] attempt ${attempt} failed with ${modelName} (duration: ${duration}ms):`, err.message);
+
+      if (attempt === MAX_RETRIES) {
+        // Switch model and try again if we haven't exhausted models, otherwise throw
+        if (currentModelIndex < models.length - 1) {
+          console.warn(`[Gemini] Model ${modelName} failed. Switching to fallback model: ${models[currentModelIndex + 1]}`);
+          currentModelIndex++;
+          attempt = 0; // Reset attempts for the new model
+          continue;
+        } else {
+          console.error('[Gemini] All retries and fallbacks exhausted.');
+          throw new Error('AI Analysis temporarily unavailable due to high demand. Please try again in a few minutes.');
+        }
+      }
+
+      // If it's a transient error, wait and retry
+      if (isRateLimit || isOverload || isTimeout || isNetworkError) {
+        const backoffMs = 1000 * Math.pow(2, attempt - 1);
+        console.log(`[Gemini] Retrying in ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      } else {
+        // For standard errors (e.g., 400 Bad Request, auth failure), do not retry
+        throw new Error('AI Analysis failed: ' + err.message);
+      }
+    }
+  }
+}
+
 // ── SERVICE IMPLEMENTATIONS ──────────────────────────────────────────────────
 
 /**
@@ -417,9 +497,7 @@ Analyze the candidate's resume carefully against the job requirements. Return ON
 Be specific and accurate. Base all scores on what's actually in the resume vs the job requirements.`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await executeWithRetry(prompt);
     const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
     return JSON.parse(cleaned);
   } catch (err) {
@@ -464,11 +542,9 @@ ${resumeText.slice(0, 3000)}
 Return format: ["skill1", "skill2", ...]`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    const text = result.response.text().trim()
-      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-    return JSON.parse(text);
+    const text = await executeWithRetry(prompt);
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    return JSON.parse(cleaned);
   } catch (err) {
     console.error('Gemini extractSkills failed:', err.message);
     return localExtractSkills(resumeText);
@@ -498,11 +574,9 @@ Return ONLY JSON with this exact structure:
 }`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    const text = result.response.text().trim()
-      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-    return JSON.parse(text);
+    const text = await executeWithRetry(prompt);
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    return JSON.parse(cleaned);
   } catch (err) {
     console.error('Gemini Feedback error:', err.message);
     return localGenerateCandidateFeedback(resumeText, targetRole);
@@ -530,11 +604,9 @@ Return ONLY a JSON object with this structure (no markdown):
 }`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    const text = result.response.text().trim()
-      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-    return JSON.parse(text);
+    const text = await executeWithRetry(prompt);
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    return JSON.parse(cleaned);
   } catch (err) {
     console.error('Gemini Resume Summary error:', err.message);
     return localGenerateResumeSummary(resumeText);
@@ -600,51 +672,21 @@ async function answerCandidateQuestion({ question, candidateName, resumeSummary,
   Do not repeat your previous greeting/welcome message if the user is asking a follow-up.`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    return result.response.text().trim();
+    return await executeWithRetry(prompt);
   } catch (err) {
     console.error('Gemini Chatbot error:', err.message);
     return localAnswerCandidateQuestion({ question, candidateName, resumeSummary, appliedJobs, availableJobs });
   }
 }
 
-function localAnalyzeResumeSelf(resumeText) {
-  const skills = localExtractSkills(resumeText);
-  const strengths = skills.slice(0, 3);
-  const missingSkills = ['Docker', 'Kubernetes'];
-  const suggestions = ['Add project descriptions', 'Quantify achievements to showcase impact'];
-  return {
-    resumeScore: 82,
-    atsScore: 88,
-    strengths,
-    missingSkills,
-    suggestions
-  };
-}
 
-function localAnalyzeJobMatch(resumeText, jobTitle, skillsRequired) {
-  const skills = localExtractSkills(resumeText);
-  const jobSkills = (skillsRequired || '').split(',').map(s => s.trim()).filter(Boolean);
-  
-  const matchingSkills = jobSkills.filter(js => skills.some(s => s.toLowerCase() === js.toLowerCase()));
-  const missingSkills = jobSkills.filter(js => !skills.some(s => s.toLowerCase() === js.toLowerCase()));
-  
-  const matched = matchingSkills.length > 0 ? matchingSkills : ['Python', 'FastAPI', 'SQL'];
-  const missing = missingSkills.length > 0 ? missingSkills : ['AWS'];
-  
-  return {
-    matchScore: 91,
-    matchingSkills: matched,
-    missingSkills: missing,
-    experienceRelevance: 'Strong alignment with requirements',
-    recommendation: 'Strong Match'
-  };
-}
 
 async function analyzeResumeSelf({ resumeText, candidateName }) {
+  console.log(`[Gemini] Starting resume self-analysis for candidate: ${candidateName}`);
+  console.log(`[Gemini] Resume text length: ${resumeText?.length || 0} characters`);
+  
   if (!GEMINI_API_KEY) {
-    return localAnalyzeResumeSelf(resumeText);
+    throw new Error('GEMINI_API_KEY is missing. Production analysis cannot proceed.');
   }
 
   const prompt = `You are an expert AI resume reviewer. Read the following resume text and provide a self-improvement resume analysis report for the candidate.
@@ -653,7 +695,7 @@ async function analyzeResumeSelf({ resumeText, candidateName }) {
   ${candidateName}
   
   ## RESUME TEXT
-  ${resumeText.slice(0, 4000)}
+  ${resumeText ? resumeText.slice(0, 15000) : ''}
   
   ## INSTRUCTIONS
   Analyze the resume carefully. Return ONLY a valid JSON object with the following structure (no markdown, no other text):
@@ -668,20 +710,25 @@ async function analyzeResumeSelf({ resumeText, candidateName }) {
   Note: strengths, missingSkills, and suggestions must be array of strings.`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    const text = result.response.text().trim();
+    console.log(`[Gemini] Request sent successfully. Waiting for response...`);
+    const text = await executeWithRetry(prompt);
+    console.log(`[Gemini] Response received. Parsing JSON...`);
     const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-    return JSON.parse(cleaned);
+    const analysis = JSON.parse(cleaned);
+    console.log(`[Gemini] Analysis generated successfully:`, analysis);
+    return analysis;
   } catch (err) {
     console.error('Gemini analyzeResumeSelf error:', err.message);
-    return localAnalyzeResumeSelf(resumeText);
+    throw new Error('Unable to connect to Gemini AI: ' + err.message);
   }
 }
 
 async function analyzeJobMatch({ resumeText, candidateName, jobTitle, jobDescription, skillsRequired, requirements }) {
+  console.log(`[Gemini] Starting job match analysis for candidate: ${candidateName} against job: ${jobTitle}`);
+  console.log(`[Gemini] Resume text length: ${resumeText?.length || 0} characters`);
+
   if (!GEMINI_API_KEY) {
-    return localAnalyzeJobMatch(resumeText, jobTitle, skillsRequired);
+    throw new Error('GEMINI_API_KEY is missing. Production analysis cannot proceed.');
   }
 
   const prompt = `You are an expert AI recruitment matching assistant. Evaluate the following resume against the job description for the role of "${jobTitle}".
@@ -696,7 +743,7 @@ async function analyzeJobMatch({ resumeText, candidateName, jobTitle, jobDescrip
   Requirements: ${requirements || 'Not specified'}
   
   ## CANDIDATE RESUME TEXT
-  ${resumeText.slice(0, 4000)}
+  ${resumeText ? resumeText.slice(0, 15000) : ''}
   
   ## INSTRUCTIONS
   Analyze the resume against the job details. Return ONLY a valid JSON object with the following structure (no markdown, no other text):
@@ -711,14 +758,45 @@ async function analyzeJobMatch({ resumeText, candidateName, jobTitle, jobDescrip
   Note: matchingSkills and missingSkills must be arrays of strings.`;
 
   try {
-    const m = getModel();
-    const result = await m.generateContent(prompt);
-    const text = result.response.text().trim();
+    console.log(`[Gemini] Match analysis request sent successfully.`);
+    const text = await executeWithRetry(prompt);
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    const analysis = JSON.parse(cleaned);
+    console.log(`[Gemini] Match analysis generated successfully: Score = ${analysis.matchScore}`);
+    return analysis;
+  } catch (err) {
+    console.error('Gemini analyzeJobMatch error:', err.message);
+    throw new Error('Unable to connect to Gemini AI: ' + err.message);
+  }
+}
+
+async function extractResumeInfo(resumeText) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is missing. Production analysis cannot proceed.');
+  }
+
+  const prompt = `Analyze this resume and extract the following details:
+  - Total years of professional experience as an integer.
+  - Highest education qualification (degree and major).
+  - List of key technical skills, programming languages, and tools mentioned.
+  
+  Return ONLY a valid JSON object with the following structure (no markdown, no formatting, just raw JSON):
+  {
+    "years": <number>,
+    "education": "<string>",
+    "skills": ["<skill1>", "<skill2>", ...]
+  }
+  
+  Resume Text:
+  ${resumeText ? resumeText.slice(0, 15000) : ''}`;
+
+  try {
+    const text = await executeWithRetry(prompt);
     const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
     return JSON.parse(cleaned);
   } catch (err) {
-    console.error('Gemini analyzeJobMatch error:', err.message);
-    return localAnalyzeJobMatch(resumeText, jobTitle, skillsRequired);
+    console.error('Gemini extractResumeInfo error:', err.message);
+    throw new Error('Unable to connect to Gemini AI: ' + err.message);
   }
 }
 
@@ -729,7 +807,8 @@ module.exports = {
   generateResumeSummary, 
   answerCandidateQuestion,
   analyzeResumeSelf,
-  analyzeJobMatch
+  analyzeJobMatch,
+  extractResumeInfo
 };
 
 

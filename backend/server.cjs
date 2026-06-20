@@ -37,6 +37,17 @@ app.use('/api/applications', appRoutes);
 app.use('/api/interviews',  interviewRoutes);
 app.use('/api/resume',      resumeRoutes);
 
+// System Diagnostics Route
+app.get('/api/system/smtp-test', async (req, res) => {
+  const { verifySmtp } = require('./services/email.cjs');
+  const result = await verifySmtp();
+  if (result.success) {
+    return res.json({ status: 'success', message: result.message });
+  } else {
+    return res.status(500).json({ status: 'error', message: result.message });
+  }
+});
+
 // Database-backed Analytics Route
 app.get('/api/analytics', async (req, res) => {
   try {

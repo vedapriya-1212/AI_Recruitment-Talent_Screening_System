@@ -266,21 +266,16 @@ async function sendEmail({ to, subject, html, text, candidateName, jobTitle, sta
 
   console.log(`[Email Service] 📧 Preparing email → ${to} | Status: ${statusTrigger || 'N/A'} | Job: ${jobTitle || 'N/A'}`);
 
-  // ── Mock mode (no credentials) ────────────────────────────────────────────
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log('[Email Service] ⚠️  Mock mode — SMTP credentials not set.');
-    console.log('══════════════════════════════════════════════════════');
-    console.log(`  To:       ${to}`);
-    console.log(`  Subject:  ${subject}`);
-    console.log(`  Trigger:  ${statusTrigger || 'N/A'}`);
-    console.log(`  Body:\n${emailBody.substring(0, 300)}`);
-    console.log('══════════════════════════════════════════════════════');
-
+    const errMsg = 'SMTP Authentication Error: Credentials not configured.';
+    console.error(`[Email Service] 💀 ${errMsg}`);
     await logEmail({
-      recipient: to, subject, body: emailBody, status: 'Sent (Mock)',
+      recipient: to, subject, body: emailBody,
+      status:    `Failed: ${errMsg}`,
       candidateName, candidateEmail: to, jobTitle, statusTrigger,
+      errorMessage: errMsg,
     });
-    return { mock: true, success: true };
+    throw new Error(errMsg);
   }
 
   // ── Real SMTP with retry ───────────────────────────────────────────────────

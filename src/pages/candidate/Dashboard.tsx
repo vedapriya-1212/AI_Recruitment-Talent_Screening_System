@@ -137,7 +137,7 @@ export default function CandidateDashboard() {
       </motion.div>
 
       {/* TOP METRIC CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Applications', value: stats.total, icon: ClipboardList, color: 'primaryGlow', sub: 'Active Pipelines' },
           { label: 'Shortlisted', value: stats.shortlisted, icon: Trophy, color: '[#4FFAF0]', sub: 'Proceeding Stage' },
@@ -233,7 +233,7 @@ export default function CandidateDashboard() {
             ) : (
               <div className="flex flex-col gap-3 overflow-y-auto max-h-44">
                 {myInterviews.slice(0, 4).map(iv => (
-                  <div key={iv.id} className="p-3 rounded-xl bg-white/2 border border-white/5 flex items-center justify-between gap-3">
+                  <div key={iv.id} className="p-3 rounded-xl bg-white/2 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
                     <div>
                       <span className="text-xs font-bold text-white block font-space uppercase">{iv.jobTitle}</span>
                       <span className="text-[9px] text-mutedGray block font-outfit mt-0.5">{iv.stage}</span>
@@ -271,7 +271,7 @@ export default function CandidateDashboard() {
           ) : (
             <div className="flex flex-col gap-3">
               {myApplications.slice(0, 4).map(app => (
-                <div key={app.id} className="p-3 rounded-xl bg-[#071021]/30 border border-white/5 flex items-center justify-between gap-3">
+                <div key={app.id} className="p-3 rounded-xl bg-[#071021]/30 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
                   <div>
                     <span className="text-xs font-bold text-white block font-space uppercase leading-tight">{app.jobTitle}</span>
                     <span className="text-[9px] text-mutedGray block font-outfit">{app.company} • {app.appliedDate}</span>

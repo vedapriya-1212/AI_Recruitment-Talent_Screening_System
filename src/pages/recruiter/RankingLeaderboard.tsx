@@ -7,11 +7,29 @@ export default function RankingLeaderboard() {
   const { candidates, jobs } = useApplication();
   const [selectedJob, setSelectedJob] = useState<string>('all');
 
-  // Filter candidates by job
-  const filtered = candidates.filter((c) => selectedJob === 'all' || c.jobId === selectedJob);
+  // Mock new AI Interview scores for candidates
+  const candidatesWithInterviewScores = candidates.map(c => ({
+    ...c,
+    techScore: Math.floor(Math.random() * 20) + 75,
+    codingScore: Math.floor(Math.random() * 20) + 75,
+    hrScore: Math.floor(Math.random() * 20) + 75,
+    integrityScore: Math.floor(Math.random() * 5) + 95,
+    // Formula: 30% Resume + 40% Tech + 15% Coding + 10% HR + 5% Integrity
+    get finalScore() {
+      return (
+        (this.matchScore * 0.30) +
+        (this.techScore * 0.40) +
+        (this.codingScore * 0.15) +
+        (this.hrScore * 0.10) +
+        (this.integrityScore * 0.05)
+      ).toFixed(1);
+    }
+  }));
 
-  // Sort by match score to compute leaderboard ranks
-  const sorted = [...filtered].sort((a, b) => b.matchScore - a.matchScore);
+  const filtered = candidatesWithInterviewScores.filter((c) => selectedJob === 'all' || c.jobId === selectedJob);
+
+  // Sort by final score
+  const sorted = [...filtered].sort((a, b) => Number(b.finalScore) - Number(a.finalScore));
 
   // Identify top 3 for the podium
   const firstPlace = sorted[0];
@@ -61,7 +79,7 @@ export default function RankingLeaderboard() {
               <div className="text-center mb-3">
                 <span className="text-[10px] font-bold text-mutedGray bg-white/5 border border-white/10 px-2.5 py-0.5 rounded font-space">#02</span>
                 <h4 className="text-xs font-bold text-white font-space mt-1.5 truncate max-w-[90px] sm:max-w-none">{secondPlace.name}</h4>
-                <p className="text-[10px] text-secondaryGlow font-black font-space mt-0.5">{secondPlace.matchScore}% Match</p>
+                <p className="text-[10px] text-secondaryGlow font-black font-space mt-0.5">{secondPlace.finalScore} / 100</p>
               </div>
               <div className="w-full h-24 sm:h-28 rounded-t-2xl bg-gradient-to-b from-[#94A3B8]/25 to-white/2 border border-white/10 flex flex-col items-center justify-center relative shadow-[0_-5px_20px_rgba(148,163,184,0.08)]">
                 <Trophy className="w-8 h-8 text-[#94A3B8]" />
@@ -81,7 +99,7 @@ export default function RankingLeaderboard() {
               <div className="text-center mb-3">
                 <span className="text-[10px] font-bold text-[#FFD166] bg-[#FFD166]/10 border border-[#FFD166]/25 px-2.5 py-0.5 rounded font-space shadow-[0_0_8px_rgba(255,209,102,0.1)]">#01</span>
                 <h4 className="text-sm font-black text-white font-space mt-2.5 truncate max-w-[100px] sm:max-w-none">{firstPlace.name}</h4>
-                <p className="text-xs text-[#FFD166] font-black font-space mt-0.5">{firstPlace.matchScore}% Match</p>
+                <p className="text-xs text-[#FFD166] font-black font-space mt-0.5">{firstPlace.finalScore} / 100</p>
               </div>
               <div className="w-full h-32 sm:h-36 rounded-t-2xl bg-gradient-to-b from-[#FFD166]/20 to-white/2 border border-[#FFD166]/30 flex flex-col items-center justify-center relative shadow-[0_-8px_25px_rgba(255,209,102,0.12)]">
                 {/* Floating gold orb */}
@@ -103,7 +121,7 @@ export default function RankingLeaderboard() {
               <div className="text-center mb-3">
                 <span className="text-[10px] font-bold text-accentGlow bg-accentGlow/10 border border-accentGlow/25 px-2.5 py-0.5 rounded font-space">#03</span>
                 <h4 className="text-xs font-bold text-white font-space mt-1.5 truncate max-w-[90px] sm:max-w-none">{thirdPlace.name}</h4>
-                <p className="text-[10px] text-accentGlow font-black font-space mt-0.5">{thirdPlace.matchScore}% Match</p>
+                <p className="text-[10px] text-accentGlow font-black font-space mt-0.5">{thirdPlace.finalScore} / 100</p>
               </div>
               <div className="w-full h-20 sm:h-24 rounded-t-2xl bg-gradient-to-b from-[#FF5EB5]/20 to-white/2 border border-[#FF5EB5]/10 flex flex-col items-center justify-center relative shadow-[0_-5px_20px_rgba(255,94,181,0.08)]">
                 <Trophy className="w-7 h-7 text-[#FF5EB5]" />
@@ -125,9 +143,12 @@ export default function RankingLeaderboard() {
               <tr className="border-b border-white/5 text-[9px] font-bold uppercase tracking-wider text-mutedGray font-space pb-3">
                 <th className="py-3 px-4">Rank</th>
                 <th className="py-3 px-4">Candidate</th>
-                <th className="py-3 px-4">AI Match</th>
-                <th className="py-3 px-4 text-center">Exp</th>
-                <th className="py-3 px-4 text-center">AI Recommendation</th>
+                <th className="py-3 px-4">Final Score</th>
+                <th className="py-3 px-4 text-center">Resume (30%)</th>
+                <th className="py-3 px-4 text-center">Tech (40%)</th>
+                <th className="py-3 px-4 text-center">Code (15%)</th>
+                <th className="py-3 px-4 text-center">HR (10%)</th>
+                <th className="py-3 px-4 text-center">Integrity (5%)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/4 text-xs font-outfit text-mutedGray">
@@ -154,18 +175,16 @@ export default function RankingLeaderboard() {
                   <td className="py-4 px-4 font-bold text-white font-space uppercase tracking-wide">
                     {cand.name}
                   </td>
-                  {/* AI Match */}
-                  <td className="py-4 px-4 text-primaryGlow font-bold font-space">
-                    {cand.matchScore}%
+                  {/* Final Score */}
+                  <td className="py-4 px-4 text-primaryGlow font-bold font-space text-lg">
+                    {cand.finalScore}
                   </td>
-                  {/* Exp */}
-                  <td className="py-4 px-4 text-center">
-                    {cand.experienceYears} yrs
-                  </td>
-                  {/* AI Recommendation */}
-                  <td className="py-4 px-4 text-center font-bold text-[#FFD166] font-space uppercase">
-                    {cand.screeningReport?.recommendation || 'Proceed to Review'}
-                  </td>
+                  {/* Breakdown */}
+                  <td className="py-4 px-4 text-center text-mutedGray text-xs">{cand.matchScore}%</td>
+                  <td className="py-4 px-4 text-center text-secondaryGlow text-xs">{cand.techScore}</td>
+                  <td className="py-4 px-4 text-center text-accentGlow text-xs">{cand.codingScore}</td>
+                  <td className="py-4 px-4 text-center text-[#FFD166] text-xs">{cand.hrScore}</td>
+                  <td className="py-4 px-4 text-center text-success text-xs">{cand.integrityScore}</td>
                 </tr>
               ))}
             </tbody>

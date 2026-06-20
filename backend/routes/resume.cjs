@@ -40,14 +40,14 @@ router.post('/upload', requireAuth, upload.single('resume'), async (req, res) =>
 
   // Try extracting PDF text
   try {
-    const pdfParse = require('pdf-parse');
-    const parsed = await pdfParse(req.file.buffer);
-    resumeText = parsed.text || '';
-    console.log(`[Resume] Extracted ${resumeText.length} chars from ${req.file.originalname} for candidate ${candidateId}`);
+    const { extractTextFromPDF } = require('../services/pdfParser.cjs');
+    const parsed = await extractTextFromPDF(req.file.buffer);
+    resumeText = parsed.text;
+    console.log(`[Resume] Extracted ${resumeText.length} chars from ${parsed.pages} pages of ${req.file.originalname}`);
+    console.log(`[Resume] Preview: ${resumeText.slice(0, 100).replace(/\\n/g, ' ')}...`);
   } catch (pdfErr) {
-    console.warn('[Resume] pdf-parse failed, using raw buffer text:', pdfErr.message);
-    // Fallback: decode PDF buffer as text (partial content)
-    resumeText = req.file.buffer.toString('utf8', 0, Math.min(req.file.buffer.length, 5000));
+    console.warn('[Resume] PDF Extraction Failed:', pdfErr.message);
+    return res.status(500).json({ error: 'Unable to extract text from PDF. Ensure the file is not corrupted or image-only.' });
   }
 
   // Extract candidate skills
