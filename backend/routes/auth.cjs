@@ -93,7 +93,7 @@ router.post('/signup', async (req, res) => {
     }
 
     // 2. If OTP is NOT provided, generate it and send it
-    if (!otp) {
+    /*if (!otp) {
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
 
@@ -117,7 +117,68 @@ router.post('/signup', async (req, res) => {
       });
 
       return res.json({ otpRequired: true, message: 'OTP sent to email' });
+    }*/
+   if (!otp) {
+  const { data: authData, error: authError } =
+    await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+  if (authError) {
+    return res.status(400).json({
+      error: authError.message,
+    });
+  }
+
+  const userId = authData.user.id;
+
+  const { error: dbError } = await supabase
+    .from('users')
+    .upsert(
+      {
+        id: userId,
+        email,
+        first_name,
+        last_name: safeLastName,
+        role,
+        password_hash: 'managed_by_supabase_auth',
+      },
+      { onConflict: 'id' }
+    );
+
+  if (dbError) {
+    console.warn(dbError.message);
+  }
+
+  if (role === 'candidate') {
+    try {
+      await supabase
+        .from('candidate_profiles')
+        .upsert(
+          {
+            candidate_id: userId,
+            completion_percentage: 0,
+            views_count: 0,
+          },
+          { onConflict: 'candidate_id' }
+        );
+    } catch (e) {
+      console.warn(e.message);
     }
+  }
+
+  return res.json({
+    token: authData.session?.access_token || null,
+    user: {
+      id: userId,
+      email,
+      first_name,
+      last_name: safeLastName,
+      role,
+    },
+  });
+}
 
     // 3. OTP is provided - verify it
     const pending = pendingRegistrations.get(email.toLowerCase());
